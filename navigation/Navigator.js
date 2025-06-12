@@ -1,12 +1,73 @@
-import { Text, View } from 'react-native'
-import React, { Component } from 'react'
+import React from 'react';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import HomeScreen from '../screens/HomeScreen';
+import AchievementScreen from '../screens/AchievementScreen';
+import CoursesScreen from '../screens/CoursesScreen';
+import MembershipScreen from '../screens/MembershipScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import BlogScreen from '../screens/BlogScreen';
+import LoginScreen from '../screens/Auth/LoginScreen';
+import SignupScreen from '../screens/Auth/SignupScreen'; 
+import BlogDetailScreen from '../screens/BlogDetailScreen';
 
-export default class Navigator extends Component {
-  render() {
-    return (
-      <View>
-        <Text>Navigator</Text>
-      </View>
-    )
-  }
+const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator(); 
+
+export function TabNavigator() { 
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ color, size }) => {
+          let iconName;
+
+          if (route.name === 'Home') {
+            iconName = 'home';
+          } else if (route.name === 'Achievements') {
+            iconName = 'trophy';
+          } else if (route.name === 'Courses') {
+            iconName = 'book';
+          } else if (route.name === 'Membership') {
+            iconName = 'card';
+          } else if (route.name === 'Profile') {
+            iconName = 'person';
+          } else if (route.name === 'Blog') {
+            iconName = 'newspaper';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: 'black',
+        tabBarInactiveTintColor: 'gray',
+        tabBarStyle: { 
+          backgroundColor: '#f0f0f0', 
+          borderTopWidth: 0, 
+          paddingBottom: 5,
+          height: 60,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+        },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Achievements" component={AchievementScreen} />
+      <Tab.Screen name="Courses" component={CoursesScreen} />
+      <Tab.Screen name="Membership" component={MembershipScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Blog" component={BlogScreen} />
+    </Tab.Navigator>
+  );
+}
+
+//Auth Stack
+export function AuthStackScreen() { 
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Signup" component={SignupScreen} />
+    </Stack.Navigator>
+  );
 }
