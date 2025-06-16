@@ -6,7 +6,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './context/AuthContext'; 
 
 import { TabNavigator, AuthStackScreen } from './navigation/Navigator';
-import BlogDetailScreen from './screens/BlogDetailScreen';
 
 const RootStack = createNativeStackNavigator();
 
@@ -29,7 +28,6 @@ function RootNavigatorContent() {
       ) : (
         <RootStack.Group>
           <RootStack.Screen name="MainTabs" component={TabNavigator} />
-          <RootStack.Screen name="BlogDetail" component={BlogDetailScreen} />
         </RootStack.Group>
       )}
     </RootStack.Navigator>

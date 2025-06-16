@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import AchievementScreen from '../screens/AchievementScreen';
@@ -14,6 +15,24 @@ import BlogDetailScreen from '../screens/BlogDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator(); 
+
+function BlogStackScreen() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false, 
+      }}
+    >
+      <Stack.Screen name="Blog" component={BlogScreen} />
+      <Stack.Screen name="BlogDetail" component={BlogDetailScreen} 
+      options={{
+        headerShown: true,
+        headerTitle: 'Back',
+      }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 export function TabNavigator() { 
   return (
@@ -33,7 +52,7 @@ export function TabNavigator() {
             iconName = 'card';
           } else if (route.name === 'Profile') {
             iconName = 'person';
-          } else if (route.name === 'Blog') {
+          } else if (route.name === 'BlogTab') {
             iconName = 'newspaper';
           }
 
@@ -57,12 +76,11 @@ export function TabNavigator() {
       <Tab.Screen name="Courses" component={CoursesScreen} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="Blog" component={BlogScreen} />
+      <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog'}}/>
     </Tab.Navigator>
   );
 }
 
-//Auth Stack
 export function AuthStackScreen() { 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

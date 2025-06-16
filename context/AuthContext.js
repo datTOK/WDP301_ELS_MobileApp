@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }) => {
           await AsyncStorage.setItem('userToken', token);
           setUserToken(token);
           console.log('AuthContext: User signed in successfully.');
+          console.log(userToken);
         } catch (error) {
           console.error('AuthContext: Error setting token during signIn:', error);
           Alert.alert('Login Error', 'Failed to save login session. Please try again.');
