@@ -13,12 +13,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TopBar from '../components/Topbar'
-
+import { useAuth } from '../context/AuthContext';
 import { Card, Button, Image } from 'react-native-elements';
+
+const stripHtmlTags = (htmlString) => {
+  return htmlString ? htmlString.replace(/<[^>]*>/g, '').trim() : '';
+};
 
 const API_BASE_URL = 'http://localhost:4000/api/blogs';
 
-const BlogItem = ({ blog }) => {
+const BlogItem = ({ blog, navigation }) => {
+  const plainTextContent = stripHtmlTags(blog.content);
   return (
     <Card containerStyle={blogItemStyles.card}>
       {blog.coverImage ? (
@@ -34,7 +39,7 @@ const BlogItem = ({ blog }) => {
       )}
       <Card.Title style={blogItemStyles.title}>{blog.title}</Card.Title>
       <Text style={blogItemStyles.contentSnippet} numberOfLines={3}>
-        {blog.content}
+        {plainTextContent}
       </Text>
       <Text style={blogItemStyles.date}>
         Published: {new Date(blog.createdAt).toLocaleDateString()}
@@ -43,8 +48,7 @@ const BlogItem = ({ blog }) => {
         title="Read More"
         buttonStyle={blogItemStyles.readMoreButton}
         titleStyle={blogItemStyles.readMoreButtonText}
-        // onPress={() => navigation.navigate('BlogDetail', { blogId: blog.id })}
-        onpress={() => navigation.navigate('BlogDetail', { blogId: blog.id })} 
+        onPress={() => navigation.navigate('BlogDetail', { blogId: blog._id })} 
         type="solid"
       />
     </Card>
@@ -58,9 +62,9 @@ const blogItemStyles = StyleSheet.create({
     marginHorizontal: 15,
     padding: 0,
     overflow: 'hidden',
-    backgroundColor: '#2a2a2a', // Darker background for cards
-    borderColor: '#333', // Subtle border for cards
-    shadowColor: '#000', // Ensure shadow is visible on black
+    backgroundColor: '#2a2a2a',
+    borderColor: '#333', 
+    shadowColor: '#000', 
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -74,12 +78,12 @@ const blogItemStyles = StyleSheet.create({
   placeholderImage: {
     width: '100%',
     height: 180,
-    backgroundColor: '#444', // Darker placeholder
+    backgroundColor: '#444', 
     justifyContent: 'center',
     alignItems: 'center',
   },
   placeholderText: {
-    color: '#bbb', // Lighter text for placeholder
+    color: '#bbb', 
     fontSize: 16,
   },
   title: {
@@ -89,18 +93,18 @@ const blogItemStyles = StyleSheet.create({
     marginTop: 15,
     paddingHorizontal: 15,
     textAlign: 'left',
-    color: '#fff', // White text for title
+    color: '#fff', 
   },
   contentSnippet: {
     fontSize: 14,
-    color: '#ccc', // Lighter text for snippet
+    color: '#ccc', 
     lineHeight: 20,
     marginBottom: 10,
     paddingHorizontal: 15,
   },
   date: {
     fontSize: 12,
-    color: '#aaa', // Lighter grey for date
+    color: '#aaa', 
     textAlign: 'right',
     paddingHorizontal: 15,
     marginBottom: 10,
@@ -118,24 +122,23 @@ const blogItemStyles = StyleSheet.create({
   },
 });
 
-export default function BlogScreen() {
+export default function BlogScreen({navigation}) {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Pagination state
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(5);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  // Sorting and Search state
   const [order, setOrder] = useState('desc');
   const [sortBy, setSortBy] = useState('date');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Debounce search input
+  const { userToken } = useAuth(); 
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
@@ -167,7 +170,7 @@ export default function BlogScreen() {
       const response = await fetch(url, {
         headers: {
           'Accept': 'application/json',
-          // 'Authorization': `Bearer ${userAccessToken}`,
+          'Authorization': `Bearer ${userToken}`,
         },
       });
 
@@ -199,7 +202,7 @@ export default function BlogScreen() {
     } finally {
       setLoading(false);
     }
-  }, [page, size, order, sortBy, debouncedSearch]);
+  }, [page, size, order, sortBy, debouncedSearch, userToken]);
 
   useEffect(() => {
     fetchBlogs();
@@ -253,7 +256,6 @@ export default function BlogScreen() {
       <View style={styles.container}>
         <TopBar title="Blog" />
         <View style={styles.controlsContainer}>
-          {/* Reverted to standard TextInput for search functionality on web */}
           <View style={styles.searchInputWrapper}>
             <Ionicons name="search-outline" size={20} color="#888" style={styles.searchIcon} />
             <TextInput
@@ -264,12 +266,12 @@ export default function BlogScreen() {
               placeholderTextColor="#888"
               autoCapitalize="none"
               autoCorrect={false}
-              editable={true} // Ensure it's editable
-              keyboardAppearance="dark" // For better appearance on dark theme
+              editable={true} 
+              keyboardAppearance="dark" 
             />
           </View>
 
-          <View style={styles.sortFilterSection}>
+          {/* <View style={styles.sortFilterSection}>
             <View style={styles.filterRow}>
               <Text style={styles.label}>Sort By:</Text>
               <Button
@@ -305,7 +307,7 @@ export default function BlogScreen() {
                 onPress={() => { setOrder('desc'); setPage(1); }}
               />
             </View>
-          </View>
+          </View> */}
         </View>
 
         {loading && blogs.length === 0 ? (
@@ -330,7 +332,7 @@ export default function BlogScreen() {
           <FlatList
             data={blogs}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <BlogItem blog={item} />}
+            renderItem={({ item }) => <BlogItem blog={item} navigation={navigation}/>}
             contentContainerStyle={styles.listContentContainer}
             ListFooterComponent={totalPages > 1 ? renderFooter : null}
           />
@@ -370,8 +372,8 @@ const styles = StyleSheet.create({
     flex: 1, 
     fontSize: 16,
     color: '#eee', 
-    paddingVertical: Platform.OS === 'web' ? 8 : 0, // Adjust vertical padding for web to ensure clickable area
-    outlineStyle: 'none', // Remove blue outline on web focus (non-standard CSS, but useful)
+    paddingVertical: Platform.OS === 'web' ? 8 : 0, 
+    outlineStyle: 'none', 
   },
   sortFilterSection: {
     flexDirection: 'column',
@@ -386,7 +388,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginRight: 8,
     fontWeight: '600',
-    color: '#bbb', // Lighter label text
+    color: '#bbb', 
   },
   sortButton: {
     paddingVertical: 8,

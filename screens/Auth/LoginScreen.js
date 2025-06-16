@@ -25,6 +25,8 @@ export default function LoginScreen({ navigation }) {
 
       if (response.ok) {
         Alert.alert('Success', data.message);
+        console.log('Login successful! Token:', data.accessToken);
+        console.log('User data:', password);
         await signIn(data.accessToken); 
       } else {
         Alert.alert('Login Failed', data.message || 'An unknown error occurred.');
