@@ -1,5 +1,3 @@
-// not work yet
-
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,26 +8,27 @@ export default function ProfileScreen() {
   const [userData, setUserData] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true); 
   const [error, setError] = useState(null);
-  const { signOut, userToken } = useAuth(); 
+  const { signOut, userToken, userId } = useAuth(); 
 
   useEffect(() => {
-    if (userToken) {
+    if (userToken && userId) {
       fetchUserProfile();
     } else {
       setLoadingProfile(false); 
       setError("No active session found. Please log in.");
     }
-  }, [userToken]);
+  }, [userToken, userId]);
 
   const fetchUserProfile = async () => {
     setLoadingProfile(true);
     setError(null);
     try {
-      if (!userToken) {
+      if (!userToken || !userId) {
         console.log('ProfileScreen: No user token found, cannot fetch profile.');
         throw new Error('Authentication token is missing. Please log in again.');
       }
       console.log('ProfileScreen: User Token being sent:', userToken);
+      console.log('ProfileScreen: User ID being used:', userId);
       console.log('ProfileScreen: Fetching user profile...');
       const response = await fetch('http://localhost:4000/api/auth/me', {
         method: 'GET',
@@ -45,6 +44,7 @@ export default function ProfileScreen() {
       if (response.ok) {
         setUserData(data.user);
         console.log('ProfileScreen: User data set:', data.user.username);
+        console.log('ProfileScreen: User id set:', data.user._id);
       } else {
         const errorMessage = data.message || 'Failed to fetch user data.';
         console.error('ProfileScreen: Failed to fetch user data (server error):', errorMessage);
@@ -61,47 +61,47 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to log out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Logout",
-          onPress: async () => {
-            console.log('ProfileScreen: User confirmed logout. Initiating...');
-            try {
-              if (userToken) {
-                const response = await fetch('http://localhost:4000/api/auth/logout', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${userToken}`,
-                  },
-                });
+    console.log('--- Logout Button Pressed! ---');
 
-                const data = await response.json();
-                console.log('ProfileScreen: Server logout response:', data);
+    console.log('User confirmed logout (simulated). Initiating logout process...');
+    try {
+      const userToken = await AsyncStorage.getItem('userToken');
+      console.log('Retrieved userToken from AsyncStorage:', userToken ? 'Exists' : 'Does NOT Exist');
 
-                if (!response.ok) {
-                  Alert.alert('Logout Issue', data.message || 'Server logout failed. You might still be logged out locally.');
-                }
-              }
-            } catch (error) {
-              console.error('ProfileScreen: Error during server logout:', error);
-              Alert.alert('Network Error', 'Could not reach the server for logout. Logging out locally.');
-            } finally {
-              await signOut();
-              console.log('ProfileScreen: Local signOut completed.');
-            }
-          }
+      if (userToken) {
+        console.log('Making API call to /api/auth/logout with token...');
+        const response = await fetch('http://localhost:4000/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${userToken}`,
+          },
+        });
+
+        const data = await response.json();
+        console.log('API Response Status:', response.status);
+        console.log('API Response Body:', data);
+
+        if (response.ok) {
+          console.log('Server logout successful!');
+          Alert.alert('Success', data.message || 'You have been logged out.');
+        } else {
+          console.error('Server logout failed (non-2xx status):', data.message || 'Unknown server error');
+          Alert.alert('Logout Issue', data.message || 'Server logout failed. You might need to log in again.');
         }
-      ]
-    );
+      } else {
+        console.warn('No user token found locally to send to server for logout.');
+      }
+
+      await signOut();
+
+    } catch (error) {
+      console.error('CRITICAL LOGOUT ERROR:', error);
+      Alert.alert('Logout Error', 'Could not connect to the server or an unexpected error occurred. Please try again later.');
+
+      await signOut();
+    }
   };
 
   if (loadingProfile) { 
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingVertical: 40,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: 'white',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     marginBottom: 20,
@@ -260,12 +260,12 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'black',
     marginTop: 10,
   },
   email: {
     fontSize: 16,
-    color: '#bbb',
+    color: 'black',
     marginTop: 5,
   },
   infoCard: {

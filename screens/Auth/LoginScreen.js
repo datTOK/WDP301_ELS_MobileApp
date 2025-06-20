@@ -1,13 +1,15 @@
 // screens/Auth/LoginScreen.js
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, Image, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, Image, TouchableOpacity, Icon } from 'react-native';
 import { Button } from 'react-native-elements';
-import { useAuth } from '../../context/AuthContext'; 
+import { useAuth } from '../../context/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signIn } = useAuth(); 
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const { signIn } = useAuth();
 
   const handleLogin = async () => {
     console.log('Attempting login with:', { email, password });
@@ -27,7 +29,7 @@ export default function LoginScreen({ navigation }) {
         Alert.alert('Success', data.message);
         console.log('Login successful! Token:', data.accessToken);
         console.log('User data:', password);
-        await signIn(data.accessToken); 
+        await signIn(data.accessToken);
       } else {
         Alert.alert('Login Failed', data.message || 'An unknown error occurred.');
       }
@@ -36,6 +38,10 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Error', 'Could not connect to the server. Please try again later.');
     }
   };
+
+  const togglePasswordVisibility = () => {
+    setPasswordVisible(!passwordVisible);
+  }
 
   return (
     <>
@@ -56,15 +62,23 @@ export default function LoginScreen({ navigation }) {
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            secureTextEntry={!passwordVisible}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Ionicons
+            name={passwordVisible ? 'eye-off' : 'eye'}
+            size={24} 
+            color="#000"
+            onPress={togglePasswordVisibility}
+            style={{ position: 'absolute', right: 10, top: 15 }} />
+        </View>
         <Button title="Login" buttonStyle={{ backgroundColor: '#4CC2FF', width: 200 }} titleStyle={{ color: '#333' }} onPress={handleLogin} />
-        <Text style={{ color: 'white', marginTop: 20 }}>Don't you have an Account ? <Text style={{color:'red'}} onPress={() => navigation.replace('Signup')}>Sign up</Text> </Text>
+        <Text style={{ color: 'white', marginTop: 20 }}>Don't you have an Account ? <Text style={{ color: 'red' }} onPress={() => navigation.replace('Signup')}>Sign up</Text> </Text>
       </View>
     </>
   );
@@ -103,5 +117,9 @@ const styles = StyleSheet.create({
     height: '35%',
     borderRadius: 18,
     marginBottom: 30,
-  }
+  },
+
+  passwordContainer: {
+    width: '100%',
+  },
 });
