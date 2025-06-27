@@ -6,18 +6,20 @@ import {
   StyleSheet,
   Alert,
   Image,
-  KeyboardAvoidingView, 
+  KeyboardAvoidingView,
   Platform,
-  TouchableOpacity, 
+  TouchableOpacity,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button } from 'react-native-elements';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SignupScreen({ navigation }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState(''); 
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const handleSignup = async () => {
     // Basic validation
@@ -46,7 +48,7 @@ export default function SignupScreen({ navigation }) {
 
       if (response.ok) {
         Alert.alert('Success', data.message || 'Account created successfully!');
-        navigation.replace('Login'); 
+        navigation.replace('Login');
       } else {
         Alert.alert('Signup Failed', data.message || 'An unknown error occurred during signup.');
       }
@@ -56,11 +58,15 @@ export default function SignupScreen({ navigation }) {
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setPasswordVisible(!passwordVisible);
+  }
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0} 
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
 
       <View style={styles.topHeader}>
@@ -71,7 +77,7 @@ export default function SignupScreen({ navigation }) {
 
       <View style={styles.container}>
         <Image
-          source={require('../../assets/ELS_logo.png')} 
+          source={require('../../assets/ELS_logo.png')}
           style={styles.logo}
           resizeMode='contain'
         />
@@ -79,7 +85,7 @@ export default function SignupScreen({ navigation }) {
           style={styles.input}
           placeholder="Full Name"
           placeholderTextColor="#A0A0A0"
-          autoCapitalize="words" 
+          autoCapitalize="words"
           value={name}
           onChangeText={setName}
         />
@@ -92,14 +98,22 @@ export default function SignupScreen({ navigation }) {
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#A0A0A0"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#A0A0A0"
+            secureTextEntry={!passwordVisible}
+            value={password}
+            onChangeText={setPassword}
+          />
+          <Ionicons
+            name={passwordVisible ? 'eye-off' : 'eye'}
+            size={24}
+            color="#000"
+            onPress={togglePasswordVisibility}
+            style={{ position: 'absolute', right: 10, top: 15 }} />
+        </View>
         <TextInput
           style={styles.input}
           placeholder="Confirm Password"
@@ -110,7 +124,7 @@ export default function SignupScreen({ navigation }) {
         />
         <Button
           title="Sign Up"
-          buttonStyle={styles.signupButton} 
+          buttonStyle={styles.signupButton}
           titleStyle={styles.signupButtonTitle}
           onPress={handleSignup}
           activeOpacity={0.7}
@@ -129,10 +143,9 @@ export default function SignupScreen({ navigation }) {
 const styles = StyleSheet.create({
   topHeader: {
     backgroundColor: '#fff',
-    height: 140, 
-    justifyContent: 'flex-start', 
+    height: 100,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 60, 
     width: '100%',
   },
   headerTitle: {
@@ -143,7 +156,7 @@ const styles = StyleSheet.create({
   },
   whiteBridge: {
     backgroundColor: '#fff',
-    height: 40, 
+    height: 40,
     width: '100%',
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
@@ -153,35 +166,36 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#000', 
-    marginTop: -40, 
-    paddingTop: 60, 
+    backgroundColor: '#000',
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    marginTop: -40,
   },
   logo: {
     width: '75%',
-    height: '25%', 
+    height: '25%',
     borderRadius: 18,
-    marginBottom: 40, 
+    marginBottom: 40,
   },
   input: {
     width: '100%',
     padding: 15,
     borderWidth: 1,
-    borderColor: '#444', 
+    borderColor: '#444',
     borderRadius: 8,
     marginBottom: 20,
     backgroundColor: '#fff',
     fontSize: 16,
-    color: '#333', 
-    shadowColor: '#000', 
+    color: '#333',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
   },
   signupButton: {
-    backgroundColor: '#4CC2FF', 
-    width: '100%', 
+    backgroundColor: '#4CC2FF',
+    width: 200,
     borderRadius: 8,
     paddingVertical: 14,
     marginTop: 10,
@@ -189,7 +203,6 @@ const styles = StyleSheet.create({
   signupButtonTitle: {
     color: '#333',
     fontSize: 18,
-    fontWeight: 'bold',
   },
   loginTextContainer: {
     flexDirection: 'row',
@@ -202,9 +215,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   loginLink: {
-    color: '#FF4C4C', 
+    color: '#FF4C4C',
     fontWeight: 'bold',
     textDecorationLine: 'underline',
     fontSize: 16,
+  },
+  passwordContainer: {
+    width: '100%',
   },
 });

@@ -3,12 +3,15 @@ import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView, Touchable
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext'; 
 import { Ionicons } from '@expo/vector-icons'; 
+import { Avatar } from 'react-native-elements';
+import { useNavigation } from '@react-navigation/native';
 
 export default function ProfileScreen() {
   const [userData, setUserData] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true); 
   const [error, setError] = useState(null);
   const { signOut, userToken, userId } = useAuth(); 
+  const navigation = useNavigation();
 
   useEffect(() => {
     if (userToken && userId) {
@@ -104,6 +107,11 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleChangePassword = () => {
+    console.log('Change Password button pressed. Navigating to Change Password screen...');
+    navigation.navigate('Courses');
+  };
+
   if (loadingProfile) { 
     return (
       <View style={styles.centered}>
@@ -158,7 +166,11 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Ionicons name="person-circle-outline" size={80} color="#4CC2FF" />
+        {/* <Ionicons name="person-circle-outline" size={80} color="#4CC2FF" /> */}
+        <Avatar
+          size={'large'}
+          rounded
+          source={userData.avatar ? { uri: userData.avatar } : require('../assets/ELS_logo.png')} />
         <Text style={styles.username}>{userData.username || 'N/A'}</Text>
         <Text style={styles.email}>{userData.email || 'N/A'}</Text>
       </View>
@@ -194,6 +206,11 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
+
+      <TouchableOpacity style={styles.passwordButton} onPress={handleChangePassword}>
+        <Ionicons name="lock-closed-outline" size={24} color="fff"/>
+        <Text style={styles.passwordText}>Change Password</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={24} color="#fff" />
@@ -284,9 +301,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 15,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 4,
     borderBottomColor: '#333',
-    paddingBottom: 10,
+    paddingBottom: 10,  
   },
   icon: {
     marginRight: 10,
@@ -318,4 +335,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
+  passwordButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4CC2FF',
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 30,
+  },
+  passwordText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  }, 
 });
