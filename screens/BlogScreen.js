@@ -30,6 +30,7 @@ const BlogItem = ({ blog, navigation }) => {
         <Card.Image
           source={{ uri: blog.coverImage }}
           style={blogItemStyles.image}
+          resizeMode='cover'
           onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
         />
       ) : (
@@ -73,7 +74,6 @@ const blogItemStyles = StyleSheet.create({
   image: {
     width: '100%',
     height: 180,
-    resizeMode: 'cover',
   },
   placeholderImage: {
     width: '100%',
@@ -331,7 +331,7 @@ export default function BlogScreen({navigation}) {
         ) : (
           <FlatList
             data={blogs}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item._id}
             renderItem={({ item }) => <BlogItem blog={item} navigation={navigation}/>}
             contentContainerStyle={styles.listContentContainer}
             ListFooterComponent={totalPages > 1 ? renderFooter : null}
