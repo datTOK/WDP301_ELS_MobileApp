@@ -207,7 +207,7 @@ export default function ProfileScreen() {
         )}
       </View>
 
-      <TouchableOpacity style={styles.passwordButton} onPress={handleChangePassword}>
+      <TouchableOpacity style={styles.passwordButton} onPress={() => navigation.navigate('ChangePassword')}>
         <Ionicons name="lock-closed-outline" size={24} color="fff"/>
         <Text style={styles.passwordText}>Change Password</Text>
       </TouchableOpacity>

@@ -12,6 +12,7 @@ import BlogScreen from '../screens/BlogScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
 import SignupScreen from '../screens/Auth/SignupScreen'; 
 import BlogDetailScreen from '../screens/BlogDetailScreen';
+import ChangePasswordScreen from '../screens/Auth/ChangePasswordScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator(); 
@@ -30,6 +31,19 @@ function BlogStackScreen() {
         headerTitle: 'Back',
       }}
       />
+    </Stack.Navigator>
+  );
+}
+
+function ProfileStackScreen() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false, 
+      }}
+    >
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
     </Stack.Navigator>
   );
 }
@@ -75,7 +89,7 @@ export function TabNavigator() {
       <Tab.Screen name="Achievements" component={AchievementScreen} />
       <Tab.Screen name="Courses" component={CoursesScreen} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileStackScreen}  options={{ tabBarLabel: 'Profile'}}/>
       <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog'}}/>
     </Tab.Navigator>
   );
