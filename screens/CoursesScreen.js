@@ -8,36 +8,34 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  TextInput,
-  TouchableOpacity, 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Image } from 'react-native-elements';
+import { Card, Button, Image, SearchBar } from 'react-native-elements';
 
-
-const API_BASE_URL = 'http://localhost:4000/api/courses';
+const API_BASE_URL = 'http://localhost:4000/api';
 
 const CourseItem = ({ course, navigation }) => {
   return (
     <Card containerStyle={courseItemStyles.card}>
       <Card.Image
-        source={{ uri: course.coverImage || 'https://images.pexels.com/photos/5652121/pexels-photo-5652121.jpeg' }} />
+        source={{ uri: course.coverImage || 'https://images.pexels.com/photos/5652121/pexels-photo-5652121.jpeg' }}
+      />
       <Card.Title style={courseItemStyles.title}>{course.name}</Card.Title>
-      <Card.Divider style={{ backgroundColor: 'white', height: 2, marginVertical: 10, width: '90%', marginHorizontal: 'auto' }}/>
+      <Card.Divider style={{ backgroundColor: 'white', height: 2, marginVertical: 10, width: '90%', marginHorizontal: 'auto' }} />
       <Text style={courseItemStyles.contentSnippet} numberOfLines={2}>
         {course.description}
       </Text>
       <Text style={courseItemStyles.date}>
         Published: {new Date(course.createdAt).toLocaleDateString()}
       </Text>
-      {/* <Button
+      <Button
         title="Read More"
         buttonStyle={courseItemStyles.readMoreButton}
         titleStyle={courseItemStyles.readMoreButtonText}
-        onPress={() => navigation.navigate('courseDetail', { courseId: course._id })} 
+        onPress={() => navigation.navigate('courseDetail', { courseId: course._id })}
         type="solid"
-      /> */}
+      />
     </Card>
   );
 };
@@ -50,8 +48,8 @@ const courseItemStyles = StyleSheet.create({
     padding: 0,
     overflow: 'hidden',
     backgroundColor: '#2a2a2a',
-    borderColor: '#333', 
-    shadowColor: '#000', 
+    borderColor: '#333',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -64,18 +62,18 @@ const courseItemStyles = StyleSheet.create({
     marginTop: 15,
     paddingHorizontal: 15,
     textAlign: 'center',
-    color: '#fff', 
+    color: '#fff',
   },
   contentSnippet: {
     fontSize: 14,
-    color: '#ccc', 
+    color: '#ccc',
     lineHeight: 20,
     marginBottom: 10,
     paddingHorizontal: 15,
   },
   date: {
     fontSize: 12,
-    color: '#aaa', 
+    color: '#aaa',
     textAlign: 'right',
     paddingHorizontal: 15,
     marginBottom: 10,
@@ -93,7 +91,7 @@ const courseItemStyles = StyleSheet.create({
   },
 });
 
-export default function CoursesScreen({navigation}) {
+export default function CoursesScreen({ navigation }) {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -108,7 +106,7 @@ export default function CoursesScreen({navigation}) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { userToken } = useAuth(); 
+  const { userToken } = useAuth();
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -135,7 +133,7 @@ export default function CoursesScreen({navigation}) {
         queryParams.append('search', debouncedSearch);
       }
 
-      const url = `${API_BASE_URL}?${queryParams.toString()}`;
+      const url = `${API_BASE_URL}/courses?${queryParams.toString()}`;
       console.log('Fetching from URL:', url);
 
       const response = await fetch(url, {
@@ -181,13 +179,13 @@ export default function CoursesScreen({navigation}) {
 
   const handleNextPage = () => {
     if (page < totalPages) {
-      setPage(prevPage => prevPage + 1);
+      setPage((prevPage) => prevPage + 1);
     }
   };
 
   const handlePreviousPage = () => {
     if (page > 1) {
-      setPage(prevPage => prevPage - 1);
+      setPage((prevPage) => prevPage - 1);
     }
   };
 
@@ -197,7 +195,7 @@ export default function CoursesScreen({navigation}) {
         icon={<Ionicons name="arrow-back" size={20} color={page === 1 || loading ? 'gray' : '#fff'} />}
         title="Previous"
         type="clear"
-        titleStyle={[styles.paginationButtonText, page === 1 || loading ? { color: 'gray' } : {color: '#fff'}]}
+        titleStyle={[styles.paginationButtonText, page === 1 || loading ? { color: 'gray' } : { color: '#fff' }]}
         disabled={page === 1 || loading}
         onPress={handlePreviousPage}
         buttonStyle={styles.paginationButton}
@@ -210,7 +208,7 @@ export default function CoursesScreen({navigation}) {
         icon={<Ionicons name="arrow-forward" size={20} color={page === totalPages || loading ? 'gray' : '#fff'} />}
         title="Next"
         type="clear"
-        titleStyle={[styles.paginationButtonText, page === totalPages || loading ? { color: 'gray' } : {color: '#fff'}]}
+        titleStyle={[styles.paginationButtonText, page === totalPages || loading ? { color: 'gray' } : { color: '#fff' }]}
         disabled={page === totalPages || loading}
         onPress={handleNextPage}
         buttonStyle={styles.paginationButton}
@@ -225,21 +223,19 @@ export default function CoursesScreen({navigation}) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <View style={styles.container}>
-        {/* <View style={styles.controlsContainer}>
-          <View style={styles.searchInputWrapper}>
-            <Ionicons name="search-outline" size={20} color="#888" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search courses by title/content..."
-              value={search}
-              onChangeText={setSearch}
-              placeholderTextColor="#888"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={true} 
-              keyboardAppearance="dark" 
-            />
-          </View>
+        <View style={styles.controlsContainer}>
+          <SearchBar
+            platform="default"
+            placeholder="Search courses by title/content..."
+            onChangeText={setSearch}
+            value={search}
+            containerStyle={styles.searchBarContainer}
+            inputContainerStyle={styles.searchBarInputContainer}
+            inputStyle={styles.searchBarInput}
+            searchIcon={{ size: 20, color: '#888' }}
+            clearIcon={search ? { name: 'close', onPress: () => setSearch('') } : null}
+            lightTheme={false}
+          />
 
           <View style={styles.sortFilterSection}>
             <View style={styles.filterRow}>
@@ -278,7 +274,7 @@ export default function CoursesScreen({navigation}) {
               />
             </View>
           </View>
-        </View> */}
+        </View>
 
         {loading && courses.length === 0 ? (
           <ActivityIndicator size="large" color="#007bff" style={styles.loader} />
@@ -302,7 +298,7 @@ export default function CoursesScreen({navigation}) {
           <FlatList
             data={courses}
             keyExtractor={(item) => item._id}
-            renderItem={({ item }) => <CourseItem course={item} navigation={navigation}/>}
+            renderItem={({ item }) => <CourseItem course={item} navigation={navigation} />}
             contentContainerStyle={styles.listContentContainer}
             ListFooterComponent={totalPages > 1 ? renderFooter : null}
           />
@@ -315,35 +311,29 @@ export default function CoursesScreen({navigation}) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff', 
+    backgroundColor: '#fff',
   },
   controlsContainer: {
     padding: 15,
-    backgroundColor: '#1a1a1a', 
+    backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#333',
     marginBottom: 10,
   },
-  searchInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 8,
-    backgroundColor: 'fff',
+  searchBarContainer: {
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
+    borderTopWidth: 0,
+    padding: 0,
     marginBottom: 15,
-    height: 45,
-    paddingHorizontal: 10,
   },
-  searchIcon: {
-    marginRight: 10,
+  searchBarInputContainer: {
+    backgroundColor: '#333',
+    borderRadius: 8,
   },
-  searchInput: {
-    flex: 1, 
+  searchBarInput: {
+    color: '#eee',
     fontSize: 16,
-    color: '#eee', 
-    paddingVertical: Platform.OS === 'web' ? 8 : 0, 
-    outlineStyle: 'none', 
   },
   sortFilterSection: {
     flexDirection: 'column',
@@ -358,7 +348,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginRight: 8,
     fontWeight: '600',
-    color: '#bbb', 
+    color: '#bbb',
   },
   sortButton: {
     paddingVertical: 8,
