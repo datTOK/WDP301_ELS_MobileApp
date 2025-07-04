@@ -1,7 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import AchievementScreen from '../screens/AchievementScreen';
@@ -13,6 +12,7 @@ import LoginScreen from '../screens/Auth/LoginScreen';
 import SignupScreen from '../screens/Auth/SignupScreen'; 
 import BlogDetailScreen from '../screens/BlogDetailScreen';
 import ChangePasswordScreen from '../screens/Auth/ChangePasswordScreen';
+import MyCoursesScreen from '../screens/MyCoursesScreen'; 
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator(); 
@@ -26,10 +26,10 @@ function BlogStackScreen() {
     >
       <Stack.Screen name="Blog" component={BlogScreen} />
       <Stack.Screen name="BlogDetail" component={BlogDetailScreen} 
-      options={{
-        headerShown: true,
-        headerTitle: 'Back',
-      }}
+        options={{
+          headerShown: true,
+          headerTitle: 'Back',
+        }}
       />
     </Stack.Navigator>
   );
@@ -68,6 +68,8 @@ export function TabNavigator() {
             iconName = 'person';
           } else if (route.name === 'BlogTab') {
             iconName = 'newspaper';
+          } else if (route.name === 'MyCourses') {
+            iconName = 'school'; // Icon for MyCourses tab
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -89,8 +91,9 @@ export function TabNavigator() {
       <Tab.Screen name="Achievements" component={AchievementScreen} />
       <Tab.Screen name="Courses" component={CoursesScreen} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
-      <Tab.Screen name="Profile" component={ProfileStackScreen}  options={{ tabBarLabel: 'Profile'}}/>
-      <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog'}}/>
+      <Tab.Screen name="MyCourses" component={MyCoursesScreen} />
+      <Tab.Screen name="Profile" component={ProfileStackScreen} options={{ tabBarLabel: 'Profile' }} />
+      <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog' }} />
     </Tab.Navigator>
   );
 }

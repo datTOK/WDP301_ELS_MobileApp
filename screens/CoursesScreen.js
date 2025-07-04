@@ -11,16 +11,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Image, SearchBar } from 'react-native-elements';
+import { Card, Button, SearchBar } from 'react-native-elements';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
-const CourseItem = ({ course, navigation }) => {
+const CourseItem = ({ course, navigation, isEnrolled, onEnroll }) => {
   return (
     <Card containerStyle={courseItemStyles.card}>
-      <Card.Image
-        source={{ uri: course.coverImage || 'https://images.pexels.com/photos/5652121/pexels-photo-5652121.jpeg' }}
-      />
       <Card.Title style={courseItemStyles.title}>{course.name}</Card.Title>
       <Card.Divider style={{ backgroundColor: 'white', height: 2, marginVertical: 10, width: '90%', marginHorizontal: 'auto' }} />
       <Text style={courseItemStyles.contentSnippet} numberOfLines={2}>
@@ -30,11 +27,14 @@ const CourseItem = ({ course, navigation }) => {
         Published: {new Date(course.createdAt).toLocaleDateString()}
       </Text>
       <Button
-        title="Read More"
-        buttonStyle={courseItemStyles.readMoreButton}
-        titleStyle={courseItemStyles.readMoreButtonText}
-        onPress={() => navigation.navigate('courseDetail', { courseId: course._id })}
-        type="solid"
+        title={isEnrolled ? 'Enrolled' : 'Enroll'}
+        buttonStyle={courseItemStyles.enrollButton}
+        titleStyle={courseItemStyles.enrollButtonText}
+        onPress={() => !isEnrolled && onEnroll(course._id)}
+        disabled={isEnrolled}
+        type={isEnrolled ? 'outline' : 'solid'}
+        disabledStyle={{ backgroundColor: '#ccc' }}
+        disabledTitleStyle={{ color: '#666' }}
       />
     </Card>
   );
@@ -78,14 +78,14 @@ const courseItemStyles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 10,
   },
-  readMoreButton: {
+  enrollButton: {
     backgroundColor: '#007bff',
     borderRadius: 8,
     marginHorizontal: 15,
     marginBottom: 15,
     marginTop: 5,
   },
-  readMoreButtonText: {
+  enrollButtonText: {
     color: '#fff',
     fontWeight: 'bold',
   },
@@ -106,7 +106,7 @@ export default function CoursesScreen({ navigation }) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { userToken } = useAuth();
+  const { userToken, userId } = useAuth();
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -172,6 +172,41 @@ export default function CoursesScreen({ navigation }) {
       setLoading(false);
     }
   }, [page, size, order, sortBy, debouncedSearch, userToken]);
+
+  const handleEnroll = async (courseId) => {
+    console.log('Attempting to enroll for courseId:', courseId, 'with userId:', userId);
+    try {
+      const response = await fetch(`${API_BASE_URL}/user-courses`, { // Ensure this matches your API endpoint
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          courseId,
+          lessonFinished: 0,
+          averageScore: null,
+          status: 'ongoing',
+          isDeleted: false,
+        }),
+      });
+      const result = await response.json();
+      console.log('Enrollment response status:', response.status, 'Response:', result);
+
+      if (response.ok) {
+        Alert.alert('Success', 'You have successfully enrolled in the course!');
+        // Refresh the course list to reflect the updated enrollment status
+        fetchCourses();
+      } else {
+        throw new Error(result.message || 'Failed to enroll');
+      }
+    } catch (err) {
+      console.error('Enrollment error:', err.message);
+      Alert.alert('Error', err.message || 'An error occurred during enrollment.');
+    }
+  };
 
   useEffect(() => {
     fetchCourses();
@@ -298,7 +333,14 @@ export default function CoursesScreen({ navigation }) {
           <FlatList
             data={courses}
             keyExtractor={(item) => item._id}
-            renderItem={({ item }) => <CourseItem course={item} navigation={navigation} />}
+            renderItem={({ item }) => (
+              <CourseItem
+                course={item}
+                navigation={navigation}
+                isEnrolled={item.isEnrolled || false} // Relies on API to return isEnrolled
+                onEnroll={handleEnroll}
+              />
+            )}
             contentContainerStyle={styles.listContentContainer}
             ListFooterComponent={totalPages > 1 ? renderFooter : null}
           />
@@ -431,9 +473,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 8,
   },
-  paginationButton: {
-    // RNE Buttons have padding by default, adjust as needed
-  },
+  paginationButton: {},
   paginationButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
