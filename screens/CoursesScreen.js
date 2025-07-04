@@ -15,7 +15,7 @@ import { Card, Button, SearchBar } from 'react-native-elements';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
-const CourseItem = ({ course, navigation, isEnrolled, onEnroll }) => {
+const CourseItem = ({ course, navigation, userId }) => {
   return (
     <Card containerStyle={courseItemStyles.card}>
       <Card.Title style={courseItemStyles.title}>{course.name}</Card.Title>
@@ -27,14 +27,10 @@ const CourseItem = ({ course, navigation, isEnrolled, onEnroll }) => {
         Published: {new Date(course.createdAt).toLocaleDateString()}
       </Text>
       <Button
-        title={isEnrolled ? 'Enrolled' : 'Enroll'}
+        title="Read More"
         buttonStyle={courseItemStyles.enrollButton}
         titleStyle={courseItemStyles.enrollButtonText}
-        onPress={() => !isEnrolled && onEnroll(course._id)}
-        disabled={isEnrolled}
-        type={isEnrolled ? 'outline' : 'solid'}
-        disabledStyle={{ backgroundColor: '#ccc' }}
-        disabledTitleStyle={{ color: '#666' }}
+        onPress={() => navigation.navigate('CourseDetail', { courseId: course._id })}
       />
     </Card>
   );
@@ -173,41 +169,6 @@ export default function CoursesScreen({ navigation }) {
     }
   }, [page, size, order, sortBy, debouncedSearch, userToken]);
 
-  const handleEnroll = async (courseId) => {
-    console.log('Attempting to enroll for courseId:', courseId, 'with userId:', userId);
-    try {
-      const response = await fetch(`${API_BASE_URL}/user-courses`, { // Ensure this matches your API endpoint
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          courseId,
-          lessonFinished: 0,
-          averageScore: null,
-          status: 'ongoing',
-          isDeleted: false,
-        }),
-      });
-      const result = await response.json();
-      console.log('Enrollment response status:', response.status, 'Response:', result);
-
-      if (response.ok) {
-        Alert.alert('Success', 'You have successfully enrolled in the course!');
-        // Refresh the course list to reflect the updated enrollment status
-        fetchCourses();
-      } else {
-        throw new Error(result.message || 'Failed to enroll');
-      }
-    } catch (err) {
-      console.error('Enrollment error:', err.message);
-      Alert.alert('Error', err.message || 'An error occurred during enrollment.');
-    }
-  };
-
   useEffect(() => {
     fetchCourses();
   }, [fetchCourses]);
@@ -337,8 +298,7 @@ export default function CoursesScreen({ navigation }) {
               <CourseItem
                 course={item}
                 navigation={navigation}
-                isEnrolled={item.isEnrolled || false} // Relies on API to return isEnrolled
-                onEnroll={handleEnroll}
+                userId={userId}
               />
             )}
             contentContainerStyle={styles.listContentContainer}

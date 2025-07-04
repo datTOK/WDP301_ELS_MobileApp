@@ -9,23 +9,24 @@ import MembershipScreen from '../screens/MembershipScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import BlogScreen from '../screens/BlogScreen';
 import LoginScreen from '../screens/Auth/LoginScreen';
-import SignupScreen from '../screens/Auth/SignupScreen'; 
+import SignupScreen from '../screens/Auth/SignupScreen';
 import BlogDetailScreen from '../screens/BlogDetailScreen';
 import ChangePasswordScreen from '../screens/Auth/ChangePasswordScreen';
-import MyCoursesScreen from '../screens/MyCoursesScreen'; 
+import MyCoursesScreen from '../screens/MyCoursesScreen';
+import CourseDetailScreen from '../screens/CourseDetailScreen';
 
 const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator(); 
+const Stack = createNativeStackNavigator();
 
 function BlogStackScreen() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: false, 
+        headerShown: false,
       }}
     >
       <Stack.Screen name="Blog" component={BlogScreen} />
-      <Stack.Screen name="BlogDetail" component={BlogDetailScreen} 
+      <Stack.Screen name="BlogDetail" component={BlogDetailScreen}
         options={{
           headerShown: true,
           headerTitle: 'Back',
@@ -39,7 +40,7 @@ function ProfileStackScreen() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: false, 
+        headerShown: false,
       }}
     >
       <Stack.Screen name="Profile" component={ProfileScreen} />
@@ -48,7 +49,25 @@ function ProfileStackScreen() {
   );
 }
 
-export function TabNavigator() { 
+function CoursesStackScreen() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="CoursesList" component={CoursesScreen} />
+      <Stack.Screen name="CourseDetail" component={CourseDetailScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Course Details',
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+export function TabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -69,16 +88,16 @@ export function TabNavigator() {
           } else if (route.name === 'BlogTab') {
             iconName = 'newspaper';
           } else if (route.name === 'MyCourses') {
-            iconName = 'school'; // Icon for MyCourses tab
+            iconName = 'school';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: 'black',
         tabBarInactiveTintColor: 'gray',
-        tabBarStyle: { 
-          backgroundColor: '#f0f0f0', 
-          borderTopWidth: 0, 
+        tabBarStyle: {
+          backgroundColor: '#f0f0f0',
+          borderTopWidth: 0,
           paddingBottom: 5,
           height: 60,
         },
@@ -89,7 +108,7 @@ export function TabNavigator() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Achievements" component={AchievementScreen} />
-      <Tab.Screen name="Courses" component={CoursesScreen} />
+      <Tab.Screen name="Courses" component={CoursesStackScreen} options={{ tabBarLabel: 'Courses' }} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
       <Tab.Screen name="MyCourses" component={MyCoursesScreen} />
       <Tab.Screen name="Profile" component={ProfileStackScreen} options={{ tabBarLabel: 'Profile' }} />
@@ -98,7 +117,7 @@ export function TabNavigator() {
   );
 }
 
-export function AuthStackScreen() { 
+export function AuthStackScreen() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
