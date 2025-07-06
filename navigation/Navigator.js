@@ -14,6 +14,8 @@ import BlogDetailScreen from '../screens/BlogDetailScreen';
 import ChangePasswordScreen from '../screens/Auth/ChangePasswordScreen';
 import MyCoursesScreen from '../screens/MyCoursesScreen';
 import CourseDetailScreen from '../screens/CourseDetailScreen';
+import CourseOverviewScreen from '../screens/CourseOverviewScreen'; // Import the new screen
+import { useAuth } from '../context/AuthContext'; // Adjust path as needed
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -26,7 +28,9 @@ function BlogStackScreen() {
       }}
     >
       <Stack.Screen name="Blog" component={BlogScreen} />
-      <Stack.Screen name="BlogDetail" component={BlogDetailScreen}
+      <Stack.Screen
+        name="BlogDetail"
+        component={BlogDetailScreen}
         options={{
           headerShown: true,
           headerTitle: 'Back',
@@ -57,7 +61,37 @@ function CoursesStackScreen() {
       }}
     >
       <Stack.Screen name="CoursesList" component={CoursesScreen} />
-      <Stack.Screen name="CourseDetail" component={CourseDetailScreen}
+      <Stack.Screen
+        name="CourseOverview"
+        component={CourseOverviewScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Course Overview',
+        }}
+      />
+      <Stack.Screen
+        name="CourseDetail"
+        component={CourseDetailScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Course Details',
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+function MyCoursesStackScreen() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="MyCoursesList" component={MyCoursesScreen} />
+      <Stack.Screen
+        name="CourseDetail"
+        component={CourseDetailScreen}
         options={{
           headerShown: true,
           headerTitle: 'Course Details',
@@ -110,7 +144,7 @@ export function TabNavigator() {
       <Tab.Screen name="Achievements" component={AchievementScreen} />
       <Tab.Screen name="Courses" component={CoursesStackScreen} options={{ tabBarLabel: 'Courses' }} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
-      <Tab.Screen name="MyCourses" component={MyCoursesScreen} />
+      <Tab.Screen name="MyCourses" component={MyCoursesStackScreen} options={{ tabBarLabel: 'My Courses' }} />
       <Tab.Screen name="Profile" component={ProfileStackScreen} options={{ tabBarLabel: 'Profile' }} />
       <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog' }} />
     </Tab.Navigator>
@@ -124,4 +158,10 @@ export function AuthStackScreen() {
       <Stack.Screen name="Signup" component={SignupScreen} />
     </Stack.Navigator>
   );
+}
+
+export function AppNavigator() {
+  const { userToken } = useAuth();
+
+  return userToken == null ? <AuthStackScreen /> : <TabNavigator />;
 }

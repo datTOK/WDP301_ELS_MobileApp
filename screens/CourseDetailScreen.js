@@ -1,195 +1,443 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet, Image } from 'react-native';
-import { Card } from 'react-native-elements';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { Card, Button, SearchBar } from 'react-native-elements';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
-const CourseDetailScreen = ({ route }) => {
-  const { courseId } = route.params;
-  const { userToken } = useAuth();
-  const [lessons, setLessons] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchCourseDetails = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const lessonsResponse = await fetch(`${API_BASE_URL}/courses/${courseId}/lessons`, {
-        headers: {
-          'Authorization': `Bearer ${userToken}`,
-        },
-      });
-      const lessonsData = await lessonsResponse.json();
-      if (!lessonsResponse.ok) {
-        throw new Error(lessonsData.message || 'Failed to fetch lessons');
-      }
-      const lessons = lessonsData.data || [];
-
-      const lessonsWithDetails = await Promise.all(
-        lessons.map(async (lesson) => {
-          const lessonResponse = await fetch(`${API_BASE_URL}/lessons/${lesson._id}`, {
-            headers: { 'Authorization': `Bearer ${userToken}` },
-          });
-          const grammarResponse = await fetch(`${API_BASE_URL}/lessons/${lesson._id}/grammars`, {
-            headers: { 'Authorization': `Bearer ${userToken}` },
-          });
-          const vocabResponse = await fetch(`${API_BASE_URL}/lessons/${lesson._id}/vocabularies`, {
-            headers: { 'Authorization': `Bearer ${userToken}` },
-          });
-          const exerciseResponse = await fetch(`${API_BASE_URL}/exercises/${lesson._id}/lesson`, {
-            headers: { 'Authorization': `Bearer ${userToken}` },
-          });
-
-          const lessonData = await lessonResponse.json();
-          const grammarData = await grammarResponse.json();
-          const vocabData = await vocabResponse.json();
-          const exerciseData = await exerciseResponse.json();
-
-          if (!lessonResponse.ok || !grammarResponse.ok || !vocabResponse.ok || !exerciseResponse.ok) {
-            throw new Error('Failed to fetch lesson details');
-          }
-
-          return {
-            ...lessonData.data,
-            grammars: grammarData.data || [],
-            vocabularies: vocabData.data || [],
-            exercises: exerciseData.data || [],
-          };
-        })
-      );
-        setLessons(lessonsWithDetails);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCourseDetails();
-  }, [courseId, userToken]);
-
-  const renderLesson = ({ item }) => (
-    <Card containerStyle={styles.card}>
-      <Card.Title>{item.name}</Card.Title>
-      <Text style={styles.description}>{item.description}</Text>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lesson Content</Text>
-
-        {item.grammars.length > 0 ? (
-          item.grammars.map((grammar, index) => (
-            <View key={index} style={styles.item}>
-              <Text style={styles.itemTitle}>{grammar.title}</Text>
-              <Text>Structure: {grammar.structure}</Text>
-              <Text>Example: {grammar.example}</Text>
-              <Text>Explanation: {grammar.explanation}</Text>
-            </View>
-          ))
-        ) : (
-          <Text>No grammars available</Text>
-        )}
-
-        {item.vocabularies.length > 0 ? (
-          item.vocabularies.map((vocab, index) => (
-            <View key={index} style={styles.item}>
-              <Text>{vocab.englishContent} - {vocab.vietnameseContent}</Text>
-              {vocab.imageUrl && <Image source={{ uri: vocab.imageUrl }} style={styles.image} />}
-            </View>
-          ))
-        ) : (
-          <Text>No vocabularies available</Text>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Test Content</Text>
-        {item.exercises.length > 0 ? (
-          item.exercises.map((exercise, index) => (
-            <View key={index} style={styles.item}>
-              <Text>{exercise.question}</Text>
-              {exercise.options && exercise.options.length > 0 && (
-                <Text>Options: {exercise.options.join(', ')}</Text>
-              )}
-              <Text>Answer: {exercise.answer.join(', ')}</Text>
-              <Text>Explanation: {exercise.explanation}</Text>
-            </View>
-          ))
-        ) : (
-          <Text>No exercises available</Text>
-        )}
-      </View>
-    </Card>
-  );
-
-  if (loading) {
-    return <ActivityIndicator size="large" color="#007AFF" style={styles.center} />;
-  }
-
-  if (error) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
-      </View>
-    );
-  }
-
+const CourseItem = ({ course, navigation, userId }) => {
   return (
-    <FlatList
-      data={lessons}
-      renderItem={renderLesson}
-      keyExtractor={(item) => item._id}
-      contentContainerStyle={styles.container}
-    />
+    <Card containerStyle={courseItemStyles.card}>
+      <Card.Title style={courseItemStyles.title}>{course.name}</Card.Title>
+      <Card.Divider style={{ backgroundColor: 'white', height: 2, marginVertical: 10, width: '90%', marginHorizontal: 'auto' }} />
+      <Text style={courseItemStyles.contentSnippet} numberOfLines={2}>
+        {course.description}
+      </Text>
+      <Text style={courseItemStyles.date}>
+        Published: {new Date(course.createdAt).toLocaleDateString()}
+      </Text>
+      <Button
+        title="Read More"
+        buttonStyle={courseItemStyles.enrollButton}
+        titleStyle={courseItemStyles.enrollButtonText}
+        onPress={() => navigation.navigate('CourseDetail', { courseId: course._id })}
+      />
+    </Card>
   );
 };
 
+const courseItemStyles = StyleSheet.create({
+  card: {
+    borderRadius: 12,
+    marginVertical: 10,
+    marginHorizontal: 15,
+    padding: 0,
+    overflow: 'hidden',
+    backgroundColor: '#2a2a2a',
+    borderColor: '#333',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    marginTop: 15,
+    paddingHorizontal: 15,
+    textAlign: 'center',
+    color: '#fff',
+  },
+  contentSnippet: {
+    fontSize: 14,
+    color: '#ccc',
+    lineHeight: 20,
+    marginBottom: 10,
+    paddingHorizontal: 15,
+  },
+  date: {
+    fontSize: 12,
+    color: '#aaa',
+    textAlign: 'right',
+    paddingHorizontal: 15,
+    marginBottom: 10,
+  },
+  enrollButton: {
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+    marginHorizontal: 15,
+    marginBottom: 15,
+    marginTop: 5,
+  },
+  enrollButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+});
+
+export default function CoursesScreen({ navigation }) {
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const [size] = useState(5); // Removed setSize as it’s not used
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  const [order, setOrder] = useState('asc');
+  const [sortBy, setSortBy] = useState('date'); // Default to 'date'
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  const { userToken, userId } = useAuth();
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        size: size.toString(),
+        order,
+        sortBy,
+      });
+
+      if (debouncedSearch) {
+        queryParams.append('search', debouncedSearch);
+      }
+
+      const url = `${API_BASE_URL}/courses?${queryParams.toString()}`;
+      const response = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${userToken}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        const coursesData = result.data;
+        if (coursesData && Array.isArray(coursesData)) {
+          setCourses(coursesData);
+          setTotal(result.total || 0);
+          setTotalPages(result.totalPages || 0);
+        } else {
+          setCourses([]);
+          setTotal(0);
+          setTotalPages(0);
+          Alert.alert('Data Error', result.message || 'Unexpected data structure.');
+        }
+      } else {
+        setError(result.message || 'Failed to fetch courses.');
+        setCourses([]);
+      }
+    } catch (err) {
+      setError('Network error. Could not connect to the server.');
+      setCourses([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [page, size, order, sortBy, debouncedSearch, userToken]);
+
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  const handleNextPage = () => {
+    if (page < totalPages) setPage((prev) => prev + 1);
+  };
+
+  const handlePreviousPage = () => {
+    if (page > 1) setPage((prev) => prev - 1);
+  };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchCourses();
+  }, [fetchCourses]);
+
+  const renderFooter = () => (
+    <View style={styles.paginationContainer}>
+      <Button
+        icon={<Ionicons name="arrow-back" size={20} color={page === 1 || loading ? 'gray' : '#fff'} />}
+        title="Previous"
+        type="clear"
+        titleStyle={[styles.paginationButtonText, page === 1 || loading ? { color: 'gray' } : { color: '#fff' }]}
+        disabled={page === 1 || loading}
+        onPress={handlePreviousPage}
+        buttonStyle={styles.paginationButton}
+      />
+      <Text style={styles.pageInfo}>Page {page} of {totalPages}</Text>
+      <Button
+        iconRight
+        icon={<Ionicons name="arrow-forward" size={20} color={page === totalPages || loading ? 'gray' : '#fff'} />}
+        title="Next"
+        type="clear"
+        titleStyle={[styles.paginationButtonText, page === totalPages || loading ? { color: 'gray' } : { color: '#fff' }]}
+        disabled={page === totalPages || loading}
+        onPress={handleNextPage}
+        buttonStyle={styles.paginationButton}
+      />
+    </View>
+  );
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+      <View style={styles.container}>
+        <View style={styles.controlsContainer}>
+          <SearchBar
+            platform="default"
+            placeholder="Search courses by title/content..."
+            onChangeText={setSearch}
+            value={search}
+            containerStyle={styles.searchBarContainer}
+            inputContainerStyle={styles.searchBarInputContainer}
+            inputStyle={styles.searchBarInput}
+            searchIcon={{ size: 20, color: '#888' }}
+            clearIcon={search ? { name: 'close', onPress: () => setSearch('') } : null}
+            lightTheme={false}
+          />
+          <View style={styles.sortFilterSection}>
+            <View style={styles.filterRow}>
+              <Text style={styles.label}>Sort By:</Text>
+              <Button
+                title="Date"
+                type={sortBy === 'date' ? 'solid' : 'outline'}
+                buttonStyle={[styles.sortButton, sortBy === 'date' && styles.activeSortButton]}
+                titleStyle={[styles.sortButtonText, sortBy === 'date' && styles.activeSortButtonText]}
+                onPress={() => {
+                  setSortBy('date');
+                  setPage(1);
+                }}
+              />
+              <Button
+                title="Title"
+                type={sortBy === 'title' ? 'solid' : 'outline'}
+                buttonStyle={[styles.sortButton, sortBy === 'title' && styles.activeSortButton]}
+                titleStyle={[styles.sortButtonText, sortBy === 'title' && styles.activeSortButtonText]}
+                onPress={() => {
+                  setSortBy('title');
+                  setPage(1);
+                }}
+              />
+            </View>
+            <View style={styles.filterRow}>
+              <Text style={styles.label}>Order:</Text>
+              <Button
+                title="ASC"
+                type={order === 'asc' ? 'solid' : 'outline'}
+                buttonStyle={[styles.sortButton, order === 'asc' && styles.activeSortButton]}
+                titleStyle={[styles.sortButtonText, order === 'asc' && styles.activeSortButtonText]}
+                onPress={() => {
+                  setOrder('asc');
+                  setPage(1);
+                }}
+              />
+              <Button
+                title="DESC"
+                type={order === 'desc' ? 'solid' : 'outline'}
+                buttonStyle={[styles.sortButton, order === 'desc' && styles.activeSortButton]}
+                titleStyle={[styles.sortButtonText, order === 'desc' && styles.activeSortButtonText]}
+                onPress={() => {
+                  setOrder('desc');
+                  setPage(1);
+                }}
+              />
+            </View>
+          </View>
+        </View>
+
+        {loading && courses.length === 0 ? (
+          <ActivityIndicator size="large" color="#007bff" style={styles.loader} />
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={30} color="red" />
+            <Text style={styles.errorText}>{error}</Text>
+            <Button
+              title="Retry"
+              onPress={fetchCourses}
+              buttonStyle={styles.retryButton}
+              titleStyle={styles.retryButtonText}
+            />
+          </View>
+        ) : courses.length === 0 ? (
+          <View style={styles.nocoursesContainer}>
+            <Ionicons name="information-circle-outline" size={50} color="#888" />
+            <Text style={styles.nocoursesText}>No courses found.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={courses}
+            keyExtractor={(item) => item._id}
+            renderItem={({ item }) => <CourseItem course={item} navigation={navigation} userId={userId} />}
+            contentContainerStyle={styles.listContentContainer}
+            ListFooterComponent={totalPages > 1 ? renderFooter : null}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          />
+        )}
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 20,
+    flex: 1,
+    backgroundColor: '#fff',
   },
-  card: {
-    borderRadius: 10,
-    margin: 10,
+  controlsContainer: {
     padding: 15,
-  },
-  description: {
-    fontSize: 14,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
     marginBottom: 10,
   },
-  section: {
-    marginTop: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 10,
-  },
-  item: {
+  searchBarContainer: {
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
+    borderTopWidth: 0,
+    padding: 0,
     marginBottom: 15,
   },
-  itemTitle: {
+  searchBarInputContainer: {
+    backgroundColor: '#333',
+    borderRadius: 8,
+  },
+  searchBarInput: {
+    color: '#eee',
     fontSize: 16,
+  },
+  sortFilterSection: {
+    flexDirection: 'column',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 14,
+    marginRight: 8,
+    fontWeight: '600',
+    color: '#bbb',
+  },
+  sortButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+    minWidth: 80,
+    borderColor: '#555',
+  },
+  activeSortButton: {
+    backgroundColor: '#fff',
+  },
+  sortButtonText: {
     fontWeight: 'bold',
+    color: '#fff',
   },
-  image: {
-    width: 100,
-    height: 100,
-    marginTop: 5,
-    borderRadius: 5,
+  activeSortButtonText: {
+    color: '#000',
   },
-  center: {
+  listContentContainer: {
+    paddingBottom: 20,
+  },
+  loader: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  error: {
-    color: 'red',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    marginTop: 10,
     fontSize: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  nocoursesContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  nocoursesText: {
+    fontSize: 18,
+    color: '#aaa',
+    marginTop: 10,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    backgroundColor: '#1a1a1a',
+    marginTop: 10,
+    borderRadius: 12,
+    marginHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  paginationButton: {},
+  paginationButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  pageInfo: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#bbb',
   },
 });
-
-export default CourseDetailScreen;

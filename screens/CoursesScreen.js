@@ -8,6 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +16,7 @@ import { Card, Button, SearchBar } from 'react-native-elements';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
-const CourseItem = ({ course, navigation, userId }) => {
+const CourseItem = ({ course, navigation }) => {
   return (
     <Card containerStyle={courseItemStyles.card}>
       <Card.Title style={courseItemStyles.title}>{course.name}</Card.Title>
@@ -30,7 +31,7 @@ const CourseItem = ({ course, navigation, userId }) => {
         title="Read More"
         buttonStyle={courseItemStyles.enrollButton}
         titleStyle={courseItemStyles.enrollButtonText}
-        onPress={() => navigation.navigate('CourseDetail', { courseId: course._id })}
+        onPress={() => navigation.navigate('CourseOverview', { courseId: course._id })}
       />
     </Card>
   );
@@ -91,27 +92,25 @@ export default function CoursesScreen({ navigation }) {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [page, setPage] = useState(1);
-  const [size, setSize] = useState(5);
+  const [size] = useState(5); // Removed setSize as it’s not used
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
   const [order, setOrder] = useState('asc');
-  const [sortBy, setSortBy] = useState('');
+  const [sortBy, setSortBy] = useState('date'); // Default to 'date'
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { userToken, userId } = useAuth();
+  const { userToken } = useAuth();
 
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
     }, 500);
-
-    return () => {
-      clearTimeout(handler);
-    };
+    return () => clearTimeout(handler);
   }, [search]);
 
   const fetchCourses = useCallback(async () => {
@@ -121,8 +120,8 @@ export default function CoursesScreen({ navigation }) {
       const queryParams = new URLSearchParams({
         page: page.toString(),
         size: size.toString(),
-        order: order,
-        sortBy: sortBy,
+        order,
+        sortBy,
       });
 
       if (debouncedSearch) {
@@ -130,17 +129,14 @@ export default function CoursesScreen({ navigation }) {
       }
 
       const url = `${API_BASE_URL}/courses?${queryParams.toString()}`;
-      console.log('Fetching from URL:', url);
-
       const response = await fetch(url, {
         headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
+          Accept: 'application/json',
+          Authorization: `Bearer ${userToken}`,
         },
       });
 
       const result = await response.json();
-      console.log('API Response:', result);
 
       if (response.ok) {
         const coursesData = result.data;
@@ -152,20 +148,18 @@ export default function CoursesScreen({ navigation }) {
           setCourses([]);
           setTotal(0);
           setTotalPages(0);
-          Alert.alert('Data Error', result.message || 'Received unexpected data structure. Missing "data" or "courses" array.');
+          Alert.alert('Data Error', result.message || 'Unexpected data structure.');
         }
       } else {
         setError(result.message || 'Failed to fetch courses.');
-        Alert.alert('API Error', result.message || 'Failed to fetch courses.');
         setCourses([]);
       }
     } catch (err) {
-      console.error('Network or parsing error:', err);
       setError('Network error. Could not connect to the server.');
-      Alert.alert('Network Error', 'Could not connect to the server. Please check your connection.');
       setCourses([]);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [page, size, order, sortBy, debouncedSearch, userToken]);
 
@@ -174,16 +168,17 @@ export default function CoursesScreen({ navigation }) {
   }, [fetchCourses]);
 
   const handleNextPage = () => {
-    if (page < totalPages) {
-      setPage((prevPage) => prevPage + 1);
-    }
+    if (page < totalPages) setPage((prev) => prev + 1);
   };
 
   const handlePreviousPage = () => {
-    if (page > 1) {
-      setPage((prevPage) => prevPage - 1);
-    }
+    if (page > 1) setPage((prev) => prev - 1);
   };
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchCourses();
+  }, [fetchCourses]);
 
   const renderFooter = () => (
     <View style={styles.paginationContainer}>
@@ -196,9 +191,7 @@ export default function CoursesScreen({ navigation }) {
         onPress={handlePreviousPage}
         buttonStyle={styles.paginationButton}
       />
-      <Text style={styles.pageInfo}>
-        Page {page} of {totalPages}
-      </Text>
+      <Text style={styles.pageInfo}>Page {page} of {totalPages}</Text>
       <Button
         iconRight
         icon={<Ionicons name="arrow-forward" size={20} color={page === totalPages || loading ? 'gray' : '#fff'} />}
@@ -232,7 +225,6 @@ export default function CoursesScreen({ navigation }) {
             clearIcon={search ? { name: 'close', onPress: () => setSearch('') } : null}
             lightTheme={false}
           />
-
           <View style={styles.sortFilterSection}>
             <View style={styles.filterRow}>
               <Text style={styles.label}>Sort By:</Text>
@@ -241,17 +233,22 @@ export default function CoursesScreen({ navigation }) {
                 type={sortBy === 'date' ? 'solid' : 'outline'}
                 buttonStyle={[styles.sortButton, sortBy === 'date' && styles.activeSortButton]}
                 titleStyle={[styles.sortButtonText, sortBy === 'date' && styles.activeSortButtonText]}
-                onPress={() => { setSortBy('date'); setPage(1); }}
+                onPress={() => {
+                  setSortBy('date');
+                  setPage(1);
+                }}
               />
               <Button
                 title="Title"
                 type={sortBy === 'title' ? 'solid' : 'outline'}
                 buttonStyle={[styles.sortButton, sortBy === 'title' && styles.activeSortButton]}
                 titleStyle={[styles.sortButtonText, sortBy === 'title' && styles.activeSortButtonText]}
-                onPress={() => { setSortBy('title'); setPage(1); }}
+                onPress={() => {
+                  setSortBy('title');
+                  setPage(1);
+                }}
               />
             </View>
-
             <View style={styles.filterRow}>
               <Text style={styles.label}>Order:</Text>
               <Button
@@ -259,14 +256,20 @@ export default function CoursesScreen({ navigation }) {
                 type={order === 'asc' ? 'solid' : 'outline'}
                 buttonStyle={[styles.sortButton, order === 'asc' && styles.activeSortButton]}
                 titleStyle={[styles.sortButtonText, order === 'asc' && styles.activeSortButtonText]}
-                onPress={() => { setOrder('asc'); setPage(1); }}
+                onPress={() => {
+                  setOrder('asc');
+                  setPage(1);
+                }}
               />
               <Button
                 title="DESC"
                 type={order === 'desc' ? 'solid' : 'outline'}
                 buttonStyle={[styles.sortButton, order === 'desc' && styles.activeSortButton]}
                 titleStyle={[styles.sortButtonText, order === 'desc' && styles.activeSortButtonText]}
-                onPress={() => { setOrder('desc'); setPage(1); }}
+                onPress={() => {
+                  setOrder('desc');
+                  setPage(1);
+                }}
               />
             </View>
           </View>
@@ -294,15 +297,10 @@ export default function CoursesScreen({ navigation }) {
           <FlatList
             data={courses}
             keyExtractor={(item) => item._id}
-            renderItem={({ item }) => (
-              <CourseItem
-                course={item}
-                navigation={navigation}
-                userId={userId}
-              />
-            )}
+            renderItem={({ item }) => <CourseItem course={item} navigation={navigation} />}
             contentContainerStyle={styles.listContentContainer}
             ListFooterComponent={totalPages > 1 ? renderFooter : null}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           />
         )}
       </View>
@@ -378,7 +376,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    color: '#007bff',
   },
   errorContainer: {
     flex: 1,
@@ -437,7 +434,6 @@ const styles = StyleSheet.create({
   paginationButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
   },
   pageInfo: {
     fontSize: 16,
