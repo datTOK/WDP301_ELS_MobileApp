@@ -20,22 +20,28 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     const [error, setError] = useState(null);
     const [userId, setUserId] = useState(null);
 
-    // Fetch userId from AsyncStorage on component mount
+    // Fetch userId and enrollment state from AsyncStorage on component mount
     useEffect(() => {
-        const getUserId = async () => {
+        const initialize = async () => {
             try {
                 const storedUserId = await AsyncStorage.getItem('userId');
                 if (storedUserId) {
                     setUserId(storedUserId);
+                    // Check if already enrolled from localStorage
+                    const enrolledKey = `enrolled_${courseId}`;
+                    const isEnrolledStored = await AsyncStorage.getItem(enrolledKey);
+                    if (isEnrolledStored === 'true') {
+                        setIsEnrolled(true);
+                    }
                 } else {
                     setError('User ID not found in storage.');
                 }
             } catch (err) {
-                setError('Failed to retrieve user ID from storage.');
+                setError('Failed to retrieve user data from storage.');
             }
         };
-        getUserId();
-    }, []);
+        initialize();
+    }, [courseId]);
 
     const fetchData = useCallback(async () => {
         if (!userId) {
@@ -47,8 +53,7 @@ const CourseOverviewScreen = ({ route, navigation }) => {
         setLoading(true);
         setError(null);
         try {
-            // Fetch course details, lessons, enrollment status, and tests concurrently
-            const [courseResponse, lessonsResponse, userCourseResponse, testsResponse] = await Promise.all([
+            const [courseResponse, lessonsResponse, enrollmentResponse, testsResponse] = await Promise.all([
                 fetch(`${API_BASE_URL}/courses/${courseId}`, {
                     headers: { 'Authorization': `Bearer ${userToken}` },
                 }),
@@ -65,11 +70,10 @@ const CourseOverviewScreen = ({ route, navigation }) => {
 
             const courseData = await courseResponse.json();
             const lessonsData = await lessonsResponse.json();
-            const userCourseData = await userCourseResponse.json();
+            const enrollmentData = await enrollmentResponse.json();
             const testsData = await testsResponse.json();
 
-            // Check for errors in responses
-            if (!courseResponse.ok || !lessonsResponse.ok || !userCourseResponse.ok || !testsResponse.ok) {
+            if (!courseResponse.ok || !lessonsResponse.ok || !enrollmentResponse.ok || !testsResponse.ok) {
                 throw new Error('Failed to fetch data');
             }
 
@@ -77,9 +81,15 @@ const CourseOverviewScreen = ({ route, navigation }) => {
             const lessons = lessonsData.data || [];
             const tests = testsData.data || [];
 
-            setIsEnrolled(!!userCourseData.data);
-
-            // const imageUrl = course.imageUrl || null;
+            // Check enrollment status by matching courseId and userId
+            const isAlreadyEnrolled = enrollmentData.userCourse && 
+                                    enrollmentData.userCourse.courseId === courseId && 
+                                    enrollmentData.userCourse.userId === userId;
+            setIsEnrolled(isAlreadyEnrolled);
+            // Save to localStorage if enrolled
+            if (isAlreadyEnrolled) {
+                await AsyncStorage.setItem(`enrolled_${courseId}`, 'true');
+            }
 
             const totalTests = tests.length;
 
@@ -88,7 +98,6 @@ const CourseOverviewScreen = ({ route, navigation }) => {
                 description: course.description,
                 numLessons: lessons.length,
                 totalTests,
-                // imageUrl,
             });
         } catch (err) {
             setError(err.message);
@@ -119,14 +128,19 @@ const CourseOverviewScreen = ({ route, navigation }) => {
                 body: JSON.stringify({ courseId, userId }),
             });
 
+            const responseData = await response.json();
+            console.log('Response:', responseData);
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to enroll');
+                throw new Error(responseData.message || 'Failed to enroll');
             }
-            console.log(response.data)
+
             setIsEnrolled(true);
+            await AsyncStorage.setItem(`enrolled_${courseId}`, 'true'); // Persist enrollment
             Alert.alert('Success', 'You have enrolled in the course.');
+            fetchData(); // Refresh data to ensure consistency
         } catch (err) {
+            console.error('Enrollment error:', err.message);
             Alert.alert('Error', err.message);
         }
     };
@@ -156,9 +170,6 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     return (
         <View style={styles.container}>
             <Card containerStyle={styles.card}>
-                {/* {courseInfo.imageUrl && (
-                    <Image source={{ uri: courseInfo.imageUrl }} style={styles.image} />
-                )} */}
                 <Card.Title style={styles.title}>{courseInfo.title}</Card.Title>
                 <Card.Divider />
                 <Text style={styles.description}>{courseInfo.description}</Text>
@@ -188,7 +199,7 @@ const styles = StyleSheet.create({
         elevation: 8,
     },
     image: {
-        width: '100%',
+        width: '100',
         height: 150,
         borderRadius: 8,
         marginBottom: 10,
