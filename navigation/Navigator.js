@@ -15,6 +15,7 @@ import ChangePasswordScreen from '../screens/Auth/ChangePasswordScreen';
 // import MyCoursesScreen from '../screens/MyCoursesScreen';
 import CourseDetailScreen from '../screens/CourseDetailScreen';
 import CourseOverviewScreen from '../screens/CourseOverviewScreen';
+import CourseLessonScreen from '../screens/CourseLessonScreen';
 import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
@@ -67,6 +68,14 @@ function CoursesStackScreen() {
         options={{
           headerShown: true,
           headerTitle: 'Course Overview',
+        }}
+      />
+      <Stack.Screen
+        name="CourseLesson"
+        component={CourseLessonScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Lesson',
         }}
       />
       <Stack.Screen

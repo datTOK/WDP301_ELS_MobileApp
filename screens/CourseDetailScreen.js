@@ -13,10 +13,11 @@ import {
 import { Card, Button, Icon, Overlay, Chip } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
-const ExerciseItem = ({ exercise, onSubmission }) => {
+const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted }) => {
   const [userAnswer, setUserAnswer] = useState('');
   const [selectedOption, setSelectedOption] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -27,6 +28,25 @@ const ExerciseItem = ({ exercise, onSubmission }) => {
 
   const { userToken } = useAuth();
 
+  // Reset exercise state when exercise changes
+  useEffect(() => {
+    setUserAnswer('');
+    setSelectedOption('');
+    setIsSubmitted(false);
+    setIsCorrect(false);
+    setShowFeedback(false);
+    setShowAnswer(false);
+  }, [exercise._id]);
+
+  const validateAnswer = (userAnswer, correctAnswer) => {
+    if (Array.isArray(correctAnswer)) {
+      return correctAnswer.some(answer =>
+        userAnswer.trim().toLowerCase() === answer.trim().toLowerCase()
+      );
+    }
+    return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+  };
+
   const checkAnswer = async () => {
     if (!userAnswer.trim() && !selectedOption) {
       Alert.alert('Error', 'Please provide an answer before submitting.');
@@ -36,7 +56,18 @@ const ExerciseItem = ({ exercise, onSubmission }) => {
     setIsSubmitting(true);
     const answer = exercise.options && exercise.options.length > 0 ? selectedOption : userAnswer.trim();
 
+    console.log('Submitting exercise answer:');
+    console.log('Exercise ID:', exercise._id);
+    console.log('User Answer:', answer);
+    console.log('Correct Answer:', exercise.answer);
+    console.log('User Token:', userToken ? 'Token exists' : 'No token');
+
     try {
+      const isAnswerCorrect = validateAnswer(answer, exercise.answer);
+      setIsCorrect(isAnswerCorrect);
+      setIsSubmitted(true);
+      setShowFeedback(true);
+
       const response = await fetch(`${API_BASE_URL}/user-exercises/submission`, {
         method: 'POST',
         headers: {
@@ -44,30 +75,43 @@ const ExerciseItem = ({ exercise, onSubmission }) => {
           'Authorization': `Bearer ${userToken}`,
         },
         body: JSON.stringify({
-          exerciseId: exercise._id,
+          id: exercise._id,
           answer: answer,
         }),
       });
 
+      console.log('Exercise submission response status:', response.status);
       const result = await response.json();
+      console.log('Exercise submission response data:', result);
 
       if (response.ok) {
-        const correct = result.isCorrect || false;
-        setIsCorrect(correct);
-        setIsSubmitted(true);
-        setShowFeedback(true);
-        
+        // Use API result if available, otherwise use local validation
+        const apiCorrect = result.isCorrect !== undefined ? result.isCorrect : isAnswerCorrect;
+        setIsCorrect(apiCorrect);
+
         if (onSubmission) {
-          onSubmission(exercise._id, correct);
+          onSubmission(exercise._id, apiCorrect);
+        }
+
+        if (onExerciseCompleted) {
+          onExerciseCompleted(exercise._id, apiCorrect);
         }
 
         // Hide feedback after 3 seconds
         setTimeout(() => setShowFeedback(false), 3000);
       } else {
         Alert.alert('Error', result.message || 'Failed to submit answer');
+        // Still show local validation result
+        if (onExerciseCompleted) {
+          onExerciseCompleted(exercise._id, isAnswerCorrect);
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Network error. Please try again.');
+      // Show local validation result even if API fails
+      if (onExerciseCompleted) {
+        onExerciseCompleted(exercise._id, isAnswerCorrect);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -80,6 +124,9 @@ const ExerciseItem = ({ exercise, onSubmission }) => {
     setIsCorrect(false);
     setShowFeedback(false);
     setShowAnswer(false);
+    if (onExerciseCompleted) {
+      onExerciseCompleted(exercise._id, false); // Reset completion status
+    }
   };
 
   const toggleAnswer = () => {
@@ -139,10 +186,10 @@ const ExerciseItem = ({ exercise, onSubmission }) => {
           exerciseItemStyles.feedbackContainer,
           isCorrect ? exerciseItemStyles.correctFeedback : exerciseItemStyles.incorrectFeedback
         ]}>
-          <Ionicons 
-            name={isCorrect ? "checkmark-circle" : "close-circle"} 
-            size={24} 
-            color={isCorrect ? "#28a745" : "#dc3545"} 
+          <Ionicons
+            name={isCorrect ? "checkmark-circle" : "close-circle"}
+            size={24}
+            color={isCorrect ? "#28a745" : "#dc3545"}
           />
           <Text style={[
             exerciseItemStyles.feedbackText,
@@ -218,23 +265,24 @@ const ExerciseItem = ({ exercise, onSubmission }) => {
 };
 
 const CourseDetailScreen = ({ route, navigation }) => {
-  const { courseId } = route.params;
-  const { userToken } = useAuth();
-  const [lessons, setLessons] = useState([]);
+  const { courseId, lessonId, lessonName, updateLessonStatus } = route.params;
+  console.log("Course ID: ", courseId);
+  console.log("Lesson ID: ", lessonId);
+  console.log("Lesson Name: ", lessonName);
+  console.log("Update Lesson Status: ", updateLessonStatus);
+  const { userToken, user } = useAuth();
+  const [lesson, setLesson] = useState(null);
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedLessonIndex, setSelectedLessonIndex] = useState(0);
-  const [completedLessons, setCompletedLessons] = useState([]); // Array of completed lesson IDs
-  const [drawerVisible, setDrawerVisible] = useState(true); // Control drawer visibility
+  const [completedExercises, setCompletedExercises] = useState({});
+  const [completedLessons, setCompletedLessons] = useState([]);
+  const [userLesson, setUserLesson] = useState(null);
 
   // State for modal navigation
   const [modalVisible, setModalVisible] = useState(false);
   const [modalType, setModalType] = useState(null); // 'grammar' | 'vocab' | 'exercise'
   const [modalIndex, setModalIndex] = useState(0);
-
-  // Toggle drawer visibility
-  const toggleDrawer = () => setDrawerVisible(!drawerVisible);
 
   // Open modal for a specific item type and index
   const openModal = (type, index) => {
@@ -243,6 +291,208 @@ const CourseDetailScreen = ({ route, navigation }) => {
     setModalVisible(true);
   };
   const closeModal = () => setModalVisible(false);
+
+  // Reset modal state when navigating between items
+  useEffect(() => {
+    if (modalVisible) {
+      // Reset any modal-specific state here if needed
+    }
+  }, [modalIndex, modalType]);
+
+  // Track exercise completion for current lesson
+  const handleExerciseCompletion = (exerciseId, isCorrect) => {
+    setCompletedExercises(prev => ({
+      ...prev,
+      [exerciseId]: isCorrect
+    }));
+  };
+
+  // Check if all exercises in current lesson are completed correctly
+  const isLessonFullyCompleted = () => {
+    if (!lesson || !lesson.exercises || lesson.exercises.length === 0) {
+      return true; // No exercises means lesson is complete
+    }
+
+    const totalExercises = lesson.exercises.length;
+    const correctExercises = Object.values(completedExercises).filter(correct => correct).length;
+
+    return correctExercises === totalExercises;
+  };
+
+  // Create user lesson record
+  const createUserLesson = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      const response = await fetch(`${API_BASE_URL}/user-lessons`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          userId: userId,
+          lessonId: lessonId,
+        }),
+      });
+
+      console.log('Create user lesson response status:', response.status);
+      const result = await response.json();
+      console.log('Create user lesson response data:', result);
+
+      if (response.ok) {
+        console.log('User lesson created successfully');
+        return true;
+      } else {
+        console.log('Failed to create user lesson:', result.message);
+        // Don't throw error here as the lesson might already exist
+        return false;
+      }
+    } catch (error) {
+      console.log('Error creating user lesson:', error);
+      // Don't throw error here as the lesson might already exist
+      return false;
+    }
+  };
+
+  // Mark lesson as completed (only if all exercises are correct)
+  const markLessonCompleted = async (lessonId) => {
+    console.log("Lesson ID: ", lessonId);
+    if (!isLessonFullyCompleted()) {
+      Alert.alert('Incomplete', 'Please complete all exercises correctly before marking this lesson as completed.');
+      return;
+    }
+
+    if (updateLessonStatus) {
+      const success = await updateLessonStatus(lessonId, 'completed');
+      if (success) {
+        setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+        Alert.alert('Success', 'Lesson completed! You can now proceed to the next lesson.');
+      } else {
+        Alert.alert('Error', 'Failed to update lesson status. Please try again.');
+      }
+    } else {
+      setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+      Alert.alert('Success', 'Lesson completed! You can now proceed to the next lesson.');
+    }
+  };
+
+  // Fetch or create user lesson record, then fetch userLesson data
+  const fetchOrCreateUserLesson = async () => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      // Try to fetch userLesson first
+      const getRes = await fetch(`${API_BASE_URL}/user-lessons/${lessonId}`, {
+        headers: { 'Authorization': `Bearer ${userToken}` },
+      });
+      if (getRes.ok) {
+        const userLessonData = await getRes.json();
+        setUserLesson(userLessonData.userLesson || null);
+        return userLessonData.userLesson;
+      } else {
+        // If not found, create it
+        const response = await fetch(`${API_BASE_URL}/user-lessons`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`,
+          },
+          body: JSON.stringify({
+            userId: userId,
+            lessonId: lessonId,
+          }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+          setUserLesson(result.userLesson || null);
+          return result.userLesson;
+        } else {
+          setUserLesson(null);
+          return null;
+        }
+      }
+    } catch (error) {
+      setUserLesson(null);
+      return null;
+    }
+  };
+
+  const fetchLessonDetails = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('Fetching lesson details for lessonId:', lessonId);
+      console.log('Using userToken:', userToken ? 'Token exists' : 'No token');
+
+      // First, fetch or create user lesson record and get userLesson data
+      await fetchOrCreateUserLesson();
+
+      const [lessonResponse, grammarResponse, vocabResponse, exerciseResponse, testsResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/lessons/${lessonId}`, {
+          headers: { 'Authorization': `Bearer ${userToken}` },
+        }),
+        fetch(`${API_BASE_URL}/lessons/${lessonId}/grammars`, {
+          headers: { 'Authorization': `Bearer ${userToken}` },
+        }),
+        fetch(`${API_BASE_URL}/lessons/${lessonId}/vocabularies`, {
+          headers: { 'Authorization': `Bearer ${userToken}` },
+        }),
+        fetch(`${API_BASE_URL}/exercises/${lessonId}/lesson`, {
+          headers: { 'Authorization': `Bearer ${userToken}` },
+        }),
+        fetch(`${API_BASE_URL}/tests/${courseId}/course`, {
+          headers: { 'Authorization': `Bearer ${userToken}` },
+        }),
+      ]);
+
+      console.log('Lesson Response Status:', lessonResponse.status);
+      console.log('Grammar Response Status:', grammarResponse.status);
+      console.log('Vocab Response Status:', vocabResponse.status);
+      console.log('Exercise Response Status:', exerciseResponse.status);
+      console.log('Tests Response Status:', testsResponse.status);
+
+      const lessonData = await lessonResponse.json();
+      const grammarData = await grammarResponse.json();
+      const vocabData = await vocabResponse.json();
+      const exerciseData = await exerciseResponse.json();
+      const testsData = await testsResponse.json();
+
+      console.log('Lesson Response Data:', lessonData);
+      console.log('Grammar Response Data:', grammarData);
+      console.log('Vocab Response Data:', vocabData);
+      console.log('Exercise Response Data:', exerciseData);
+      console.log('Tests Response Data:', testsData);
+
+      if (!lessonResponse.ok || !grammarResponse.ok || !vocabResponse.ok || !exerciseResponse.ok || !testsResponse.ok) {
+        console.log('One or more API calls failed');
+        console.log('Lesson Response OK:', lessonResponse.ok);
+        console.log('Grammar Response OK:', grammarResponse.ok);
+        console.log('Vocab Response OK:', vocabResponse.ok);
+        console.log('Exercise Response OK:', exerciseResponse.ok);
+        console.log('Tests Response OK:', testsResponse.ok);
+        throw new Error('Failed to fetch lesson details');
+      }
+
+      const lessonWithDetails = {
+        ...lessonData.data,
+        grammars: grammarData.data || [],
+        vocabularies: vocabData.data || [],
+        exercises: exerciseData.data || [],
+      };
+
+      setLesson(lessonWithDetails);
+      setTests(testsData.data || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (lessonId) {
+      fetchLessonDetails();
+    }
+  }, [lessonId, userToken]);
 
   // Render chips for a section
   const renderChips = (items, type, label, color) => (
@@ -264,7 +514,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
   );
 
   // Render modal content for the selected item
-  const renderModalContent = (lesson) => {
+  const renderModalContent = () => {
     if (!modalType || !lesson) return null;
     let items = [];
     if (modalType === 'grammar') items = lesson.grammars;
@@ -272,7 +522,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
     if (modalType === 'exercise') items = lesson.exercises;
     if (!items[modalIndex]) return null;
     const item = items[modalIndex];
-    
+
     const handleExerciseSubmission = (exerciseId, isCorrect) => {
       console.log('Exercise submitted:', exerciseId, 'Correct:', isCorrect);
       // You can add logic here to track progress
@@ -310,7 +560,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
         )}
         {modalType === 'exercise' && (
           <View style={styles.modalBody}>
-            <ExerciseItem exercise={item} onSubmission={handleExerciseSubmission} />
+            <ExerciseItem exercise={item} onSubmission={handleExerciseSubmission} onExerciseCompleted={handleExerciseCompletion} />
           </View>
         )}
         <Button title="Close" onPress={closeModal} buttonStyle={styles.closeModalButton} />
@@ -318,156 +568,9 @@ const CourseDetailScreen = ({ route, navigation }) => {
     );
   };
 
-  const fetchCourseDetails = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [lessonsResponse, testsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/courses/${courseId}/lessons`, {
-          headers: { 'Authorization': `Bearer ${userToken}` },
-        }),
-        fetch(`${API_BASE_URL}/tests/${courseId}/course`, {
-          headers: { 'Authorization': `Bearer ${userToken}` },
-        }),
-      ]);
-
-      const lessonsData = await lessonsResponse.json();
-      const testsData = await testsResponse.json();
-
-      if (!lessonsResponse.ok) {
-        throw new Error(lessonsData.message || 'Failed to fetch lessons');
-      }
-      if (!testsResponse.ok) {
-        throw new Error(testsData.message || 'Failed to fetch tests');
-      }
-
-      const lessons = lessonsData.data || [];
-      const tests = testsData.data || [];
-
-      console.log('Original lessons data:', lessons);
-
-      const lessonsWithDetails = await Promise.all(
-        lessons.map(async (lesson) => {
-          console.log('Processing lesson:', lesson.name, lesson._id);
-          
-          const [lessonResponse, grammarResponse, vocabResponse, exerciseResponse] = await Promise.all([
-            fetch(`${API_BASE_URL}/lessons/${lesson._id}`, {
-              headers: { 'Authorization': `Bearer ${userToken}` },
-            }),
-            fetch(`${API_BASE_URL}/lessons/${lesson._id}/grammars`, {
-              headers: { 'Authorization': `Bearer ${userToken}` },
-            }),
-            fetch(`${API_BASE_URL}/lessons/${lesson._id}/vocabularies`, {
-              headers: { 'Authorization': `Bearer ${userToken}` },
-            }),
-            fetch(`${API_BASE_URL}/exercises/${lesson._id}/lesson`, {
-              headers: { 'Authorization': `Bearer ${userToken}` },
-            }),
-          ]);
-
-          const lessonData = await lessonResponse.json();
-          const grammarData = await grammarResponse.json();
-          const vocabData = await vocabResponse.json();
-          const exerciseData = await exerciseResponse.json();
-
-          if (!lessonResponse.ok || !grammarResponse.ok || !vocabResponse.ok || !exerciseResponse.ok) {
-            throw new Error('Failed to fetch lesson details');
-          }
-
-          // Preserve original lesson data and add detailed content
-          const processedLesson = {
-            ...lesson, // Keep original lesson data (name, description, _id, etc.)
-            ...lessonData.data, // Add any additional lesson details
-            grammars: grammarData.data || [],
-            vocabularies: vocabData.data || [],
-            exercises: exerciseData.data || [],
-          };
-          
-          console.log('Processed lesson:', processedLesson.name, processedLesson._id);
-          return processedLesson;
-        })
-      );
-
-      console.log('Final lessons with details:', lessonsWithDetails.map(l => ({ name: l.name, _id: l._id })));
-
-      setLessons(lessonsWithDetails);
-      setTests(tests);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCourseDetails();
-  }, [courseId, userToken]);
-
-  // Mark lesson as completed
-  const markLessonCompleted = (lessonId) => {
-    setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-  };
-
-  // Drawer/Sidebar for lessons (updated with toggle)
-  const renderLessonDrawer = () => {
-    console.log('Drawer Debug - lessons:', lessons.length, 'loading:', loading, 'error:', error);
-    console.log('Drawer Debug - lessons data:', lessons);
-    
-    return (
-      <View style={[styles.drawerContainer, !drawerVisible && styles.drawerCollapsed]}>
-        {drawerVisible ? (
-          <>
-            <View style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>Lessons</Text>
-              <TouchableOpacity onPress={toggleDrawer} style={styles.closeDrawerButton}>
-                <Ionicons name="close" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            {loading ? (
-              <View style={styles.drawerLoadingContainer}>
-                <ActivityIndicator size="small" color="#fff" />
-                <Text style={styles.drawerLoadingText}>Loading lessons...</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.drawerErrorContainer}>
-                <Text style={styles.drawerErrorText}>Error loading lessons</Text>
-              </View>
-            ) : lessons.length === 0 ? (
-              <View style={styles.drawerEmptyContainer}>
-                <Text style={styles.drawerEmptyText}>No lessons found</Text>
-              </View>
-            ) : (
-              lessons.map((lesson, idx) => (
-                <TouchableOpacity
-                  key={lesson._id || idx}
-                  style={[
-                    styles.drawerLessonItem,
-                    idx === selectedLessonIndex && styles.drawerLessonItemSelected,
-                  ]}
-                  onPress={() => setSelectedLessonIndex(idx)}
-                >
-                  <Text style={styles.drawerLessonText}>
-                    {lesson.name || `Lesson ${idx + 1}`}
-                  </Text>
-                  {completedLessons.includes(lesson._id) && (
-                    <Icon name="check-circle" type="feather" color="#28a745" size={18} containerStyle={{ marginLeft: 8 }} />
-                  )}
-                </TouchableOpacity>
-              ))
-            )}
-          </>
-        ) : (
-          <TouchableOpacity onPress={toggleDrawer} style={styles.openDrawerButton}>
-            <Ionicons name="menu" size={24} color="#fff" />
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
-
-  // Main lesson content area (updated)
-  const renderLessonContent = (lesson) => (
-    <ScrollView 
+  // Main lesson content area
+  const renderLessonContent = () => (
+    <ScrollView
       style={styles.lessonContentContainer}
       contentContainerStyle={styles.lessonContentScrollContainer}
       showsVerticalScrollIndicator={false}
@@ -478,41 +581,66 @@ const CourseDetailScreen = ({ route, navigation }) => {
         {renderChips(lesson.grammars, 'grammar', 'Grammar', '#007AFF')}
         {renderChips(lesson.vocabularies, 'vocab', 'Vocabulary', '#28a745')}
         {renderChips(lesson.exercises, 'exercise', 'Practice', '#ff9800')}
+
+        {/* Progress indicator for exercises */}
+        {lesson.exercises && lesson.exercises.length > 0 && (
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressText}>
+              Exercises Progress: {Object.values(completedExercises).filter(correct => correct).length} / {lesson.exercises.length} completed
+            </Text>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${(Object.values(completedExercises).filter(correct => correct).length / lesson.exercises.length) * 100}%`
+                  }
+                ]}
+              />
+            </View>
+          </View>
+        )}
       </Card>
       <Button
-        title={completedLessons.includes(lesson._id) ? 'Completed' : 'Mark as Completed'}
-        buttonStyle={completedLessons.includes(lesson._id) ? styles.completedButton : styles.completeButton}
-        onPress={() => markLessonCompleted(lesson._id)}
-        disabled={completedLessons.includes(lesson._id)}
+        title={completedLessons.includes(lesson._id) ? 'Completed' : (isLessonFullyCompleted() ? ('Mark as Completed') : 'Complete All Exercises')}
+        buttonStyle={completedLessons.includes(lesson._id) ? styles.completedButton : (isLessonFullyCompleted() ? styles.completeButton : styles.incompleteButton)}
+        onPress={() => markLessonCompleted(lessonId)}
+        disabled={completedLessons.includes(lesson._id) || !isLessonFullyCompleted()}
       />
-      <Overlay 
-        isVisible={modalVisible} 
-        onBackdropPress={closeModal} 
+      <Overlay
+        isVisible={modalVisible}
+        onBackdropPress={closeModal}
         overlayStyle={styles.modalOverlay}
         fullScreen={false}
       >
-        <ScrollView 
+        <ScrollView
           style={styles.modalScrollView}
           contentContainerStyle={styles.modalScrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {renderModalContent(lesson)}
+          {renderModalContent()}
         </ScrollView>
       </Overlay>
     </ScrollView>
   );
 
   if (loading) {
-    return <ActivityIndicator size="large" color="#007AFF" style={styles.center} />;
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading lesson...</Text>
+      </View>
+    );
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={50} color="#ff6b6b" />
+        <Text style={styles.errorText}>{error}</Text>
         <Button
           title="Retry"
-          onPress={fetchCourseDetails}
+          onPress={fetchLessonDetails}
           buttonStyle={styles.retryButton}
           titleStyle={styles.retryButtonText}
         />
@@ -521,28 +649,60 @@ const CourseDetailScreen = ({ route, navigation }) => {
   }
 
   return (
-    <View style={styles.mainContainer}>
-      {renderLessonDrawer()}
-      {console.log('Main Debug - selectedLessonIndex:', selectedLessonIndex, 'lessons length:', lessons.length)}
-      <View style={styles.contentContainer}>
-        {lessons.length > 0 && lessons[selectedLessonIndex] ? (
-          renderLessonContent(lessons[selectedLessonIndex])
-        ) : (
-          <View style={styles.noLessonContainer}>
-            <Text style={styles.noLessonText}>
-              {loading ? 'Loading lessons...' : error ? 'Error loading lessons' : 'No lessons available'}
-            </Text>
-          </View>
-        )}
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{lessonName}</Text>
+        <View style={styles.headerSpacer} />
       </View>
+
+      {/* Content */}
+      {lesson && renderLessonContent()}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 20,
+    flex: 1,
     backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    backgroundColor: '#181818',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 40, // Adjust as needed for spacing
+  },
+  lessonContentContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    width: '100%',
+  },
+  lessonContentScrollContainer: {
+    flexGrow: 1,
   },
   card: {
     borderRadius: 10,
@@ -606,16 +766,28 @@ const styles = StyleSheet.create({
     marginTop: 5,
     borderRadius: 5,
   },
-  center: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-  error: {
+  loadingText: {
+    color: '#007AFF',
+    marginTop: 10,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 20,
+  },
+  errorText: {
     color: '#ff6b6b',
     fontSize: 16,
     marginBottom: 20,
+    textAlign: 'center',
   },
   retryButton: {
     backgroundColor: '#007bff',
@@ -753,71 +925,6 @@ const styles = StyleSheet.create({
     color: '#ccc',
     marginTop: 5,
   },
-  mainContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-  },
-  drawerContainer: {
-    width: '25%', // Changed to percentage-based width
-    backgroundColor: '#181818',
-    paddingVertical: 20,
-    borderRightWidth: 1,
-    borderRightColor: '#333',
-    alignItems: 'center',
-  },
-  drawerCollapsed: {
-    width: '15%', // Changed to percentage-based width
-    paddingVertical: 10,
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 8,
-    marginBottom: 15,
-  },
-  closeDrawerButton: {
-    padding: 4,
-  },
-  openDrawerButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#333',
-  },
-  drawerTitle: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 15,
-  },
-  drawerLessonItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-    width: '100%',
-  },
-  drawerLessonItemSelected: {
-    backgroundColor: '#333',
-  },
-  drawerLessonText: {
-    color: '#fff',
-    fontSize: 14,
-    flex: 1,
-  },
-  lessonContentContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    width: '100%',
-  },
-  lessonContentScrollContainer: {
-    flexGrow: 1,
-  },
   completeButton: {
     backgroundColor: '#007bff',
     borderRadius: 8,
@@ -825,6 +932,11 @@ const styles = StyleSheet.create({
   },
   completedButton: {
     backgroundColor: '#28a745',
+    borderRadius: 8,
+    margin: 15,
+  },
+  incompleteButton: {
+    backgroundColor: '#6c757d',
     borderRadius: 8,
     margin: 15,
   },
@@ -902,47 +1014,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 10,
   },
-  drawerLoadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
+  progressContainer: {
+    marginTop: 15,
+    marginBottom: 10,
+    width: '100%',
+    paddingHorizontal: 10,
   },
-  drawerLoadingText: {
-    color: '#fff',
-    marginLeft: 10,
-  },
-  drawerErrorContainer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  drawerErrorText: {
-    color: '#ff6b6b',
-    fontSize: 16,
-  },
-  drawerEmptyContainer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  drawerEmptyText: {
+  progressText: {
+    fontSize: 14,
     color: '#ccc',
-    fontSize: 16,
-  },
-  noLessonContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 20,
-  },
-  noLessonText: {
-    fontSize: 18,
-    color: '#666',
+    marginBottom: 5,
     textAlign: 'center',
   },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
+  progressBar: {
+    height: 8,
+    backgroundColor: '#444',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 4,
   },
 });
 
