@@ -12,10 +12,11 @@ import LoginScreen from '../screens/Auth/LoginScreen';
 import SignupScreen from '../screens/Auth/SignupScreen';
 import BlogDetailScreen from '../screens/BlogDetailScreen';
 import ChangePasswordScreen from '../screens/Auth/ChangePasswordScreen';
-import MyCoursesScreen from '../screens/MyCoursesScreen';
+// import MyCoursesScreen from '../screens/MyCoursesScreen';
 import CourseDetailScreen from '../screens/CourseDetailScreen';
-import CourseOverviewScreen from '../screens/CourseOverviewScreen'; // Import the new screen
-import { useAuth } from '../context/AuthContext'; // Adjust path as needed
+import CourseOverviewScreen from '../screens/CourseOverviewScreen';
+import CourseLessonScreen from '../screens/CourseLessonScreen';
+import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -70,6 +71,14 @@ function CoursesStackScreen() {
         }}
       />
       <Stack.Screen
+        name="CourseLesson"
+        component={CourseLessonScreen}
+        options={{
+          headerShown: true,
+          headerTitle: 'Lesson',
+        }}
+      />
+      <Stack.Screen
         name="CourseDetail"
         component={CourseDetailScreen}
         options={{
@@ -88,7 +97,7 @@ function MyCoursesStackScreen() {
         headerShown: false,
       }}
     >
-      <Stack.Screen name="MyCoursesList" component={MyCoursesScreen} />
+      {/* <Stack.Screen name="MyCoursesList" component={MyCoursesScreen} /> */}
       <Stack.Screen
         name="CourseDetail"
         component={CourseDetailScreen}
@@ -121,10 +130,10 @@ export function TabNavigator() {
             iconName = 'person';
           } else if (route.name === 'BlogTab') {
             iconName = 'newspaper';
-          } else if (route.name === 'MyCourses') {
-            iconName = 'school';
           }
-
+          // } else if (route.name === 'MyCourses') {
+          //   iconName = 'school';
+          // }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: 'black',
@@ -138,15 +147,15 @@ export function TabNavigator() {
         tabBarLabelStyle: {
           fontSize: 12,
         },
-      })}
+      })
+      }
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Achievements" component={AchievementScreen} />
       <Tab.Screen name="Courses" component={CoursesStackScreen} options={{ tabBarLabel: 'Courses' }} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
-      <Tab.Screen name="MyCourses" component={MyCoursesStackScreen} options={{ tabBarLabel: 'My Courses' }} />
       <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog' }} />
-    </Tab.Navigator>
+    </ Tab.Navigator>
   );
 }
 
