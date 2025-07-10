@@ -9,7 +9,7 @@ const TopBar = () => {
   const navigation = useNavigation(); // <-- CORRECT: Call useNavigation() inside the component
 
   const handleArrowUpPress = () => {
-    navigation.navigate('Profile'); // Call navigate inside a function
+    navigation.navigate('ProfileStack'); // Call navigate inside a function
   };
 
   // const handleArrowBackPress = () => {
@@ -35,6 +35,7 @@ const TopBar = () => {
       }
       centerComponent={{ text: 'ELS_App', style: styles.heading }}
       backgroundColor='white'
+      containerStyle={styles.headerContainer}
     />
   );
 };
@@ -42,51 +43,6 @@ const TopBar = () => {
 export default TopBar;
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    padding: 12,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  center: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  streakText: {
-    marginLeft: 4,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  right: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pointsText: {
-    marginLeft: 4,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  headerContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#397af8',
-    marginBottom: 20,
-    width: '100%',
-    paddingVertical: 15,
-  },
   heading: {
     color: 'black',
     fontSize: 22,
@@ -97,9 +53,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 5,
   },
-  subheaderText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+  headerContainer: {
+    backgroundColor: 'white',
+    borderBottomWidth: 2, 
+    elevation: 10, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    paddingHorizontal: 20,
   },
 });

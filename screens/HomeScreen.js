@@ -1,5 +1,5 @@
 // screens/HomeScreen.js
-import { Text, View, StyleSheet, Alert, Dimensions, Image, TouchableOpacity } from 'react-native';
+import { Text, View, StyleSheet, Alert, Dimensions, Image, TouchableOpacity, ScrollView } from 'react-native';
 import React, { useEffect } from 'react';
 import TopBar from '../components/Topbar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,6 +8,7 @@ import { useAuth } from '.././context/AuthContext';
 import Swiper from 'react-native-swiper';
 import { Divider } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
+// import LottieView from 'lottie-react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -25,7 +26,7 @@ export default function HomeScreen() {
   }, [navigation]);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <TopBar />
       <View style={styles.swiperContainer}>
         <Swiper
@@ -67,11 +68,17 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {/* <LottieView
+        source={{ uri: 'https://lottie.host/b22b0b33-5217-4083-b718-c41b5563be1a/iFbVypvZql.json' }}
+        autoPlay
+        loop
+        style={{ width: 600, height: 200, alignSelf: 'center' }} /> */}
+
       <TouchableOpacity style={styles.callToActionCard} onPress={() => navigation.navigate('Courses')}>
         <Text style={styles.callToActionText}>Explore Our Courses!</Text>
         <Ionicons name="arrow-forward-outline" size={24} color={'white'} />
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -120,7 +127,7 @@ const styles = StyleSheet.create({
     marginBottom: -5,
   },
   activePaginationDot: {
-    backgroundColor: 'white', 
+    backgroundColor: 'white',
     width: 10,
     height: 10,
     borderRadius: 5,
@@ -130,10 +137,10 @@ const styles = StyleSheet.create({
     marginBottom: -5,
   },
   sectionDivider: {
-    backgroundColor: 'gray', 
+    backgroundColor: 'gray',
     height: 1,
-    marginTop: 30, 
-    width: '90%', 
+    marginTop: 30,
+    width: '90%',
     alignSelf: 'center',
     marginBottom: 20,
   },
@@ -143,7 +150,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: '700', 
+    fontWeight: '700',
     color: 'gray',
     marginBottom: 15,
     textAlign: 'center',
@@ -152,7 +159,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 18,
     borderRadius: 12,
-    marginBottom: 15, 
+    marginBottom: 15,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
@@ -167,8 +174,8 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 15,
     color: 'gray',
-    lineHeight: 22, 
-    flex: 1, 
+    lineHeight: 22,
+    flex: 1,
   },
   callToActionCard: {
     backgroundColor: 'blue', // Use primary color
