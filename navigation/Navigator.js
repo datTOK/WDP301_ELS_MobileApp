@@ -145,7 +145,6 @@ export function TabNavigator() {
       <Tab.Screen name="Courses" component={CoursesStackScreen} options={{ tabBarLabel: 'Courses' }} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
       <Tab.Screen name="MyCourses" component={MyCoursesStackScreen} options={{ tabBarLabel: 'My Courses' }} />
-      {/* <Tab.Screen name="Profile" component={ProfileStackScreen} options={{ tabBarLabel: 'Profile' }} /> */}
       <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog' }} />
     </Tab.Navigator>
   );
