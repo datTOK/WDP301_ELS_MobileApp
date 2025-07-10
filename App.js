@@ -5,7 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './context/AuthContext'; 
 
-import { TabNavigator, AuthStackScreen } from './navigation/Navigator';
+import { TabNavigator, AuthStackScreen, ProfileStackScreen } from './navigation/Navigator';
 
 const RootStack = createNativeStackNavigator();
 
@@ -28,6 +28,7 @@ function RootNavigatorContent() {
       ) : (
         <RootStack.Group>
           <RootStack.Screen name="MainTabs" component={TabNavigator} />
+          <RootStack.Screen name="ProfileStack" component={ProfileStackScreen} />
         </RootStack.Group>
       )}
     </RootStack.Navigator>
