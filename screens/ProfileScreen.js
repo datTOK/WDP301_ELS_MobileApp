@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons'; 
 import { Avatar } from 'react-native-elements';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext'; 
 
 export default function ProfileScreen() {
   const [userData, setUserData] = useState(null);
@@ -12,6 +13,7 @@ export default function ProfileScreen() {
   const [error, setError] = useState(null);
   const { signOut, userToken, userId } = useAuth(); 
   const navigation = useNavigation();
+  const { theme, toggleTheme } = useTheme(); 
 
   useEffect(() => {
     if (userToken && userId) {
@@ -164,48 +166,55 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
+    <ScrollView style={[styles.container, {backgroundColor: theme.colors.background}]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.cardBackground }]}>
         {/* <Ionicons name="person-circle-outline" size={80} color="#4CC2FF" /> */}
         <Avatar
           size={'large'}
           rounded
           source={userData.avatar ? { uri: userData.avatar } : require('../assets/ELS_logo.png')} />
-        <Text style={styles.username}>{userData.username || 'N/A'}</Text>
-        <Text style={styles.email}>{userData.email || 'N/A'}</Text>
+        <Text style={[styles.username, {color: theme.colors.text}]}>{userData.username || 'N/A'}</Text>
+        <Text style={[styles.email, {color: theme.colors.text}]}>{userData.email || 'N/A'}</Text>
       </View>
 
       <View style={styles.infoCard}>
         <View style={styles.infoRow}>
           <Ionicons name="mail-outline" size={20} color="#666" style={styles.icon} />
-          <Text style={styles.label}>Email:</Text>
-          <Text style={styles.value}>{userData.email || 'Not provided'}</Text>
+          <Text style={[styles.label, {color: theme.colors.text}]}>Email:</Text>
+          <Text style={[styles.value, {color: theme.colors.text}]}>{userData.email || 'Not provided'}</Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="calendar-outline" size={20} color="#666" style={styles.icon} />
-          <Text style={styles.label}>Member Since:</Text>
-          <Text style={styles.value}>{formatDate(userData.createdAt)}</Text>
+          <Text style={[styles.label, {color: theme.colors.text}]}>Member Since:</Text>
+          <Text style={[styles.value, {color: theme.colors.text}]}>{formatDate(userData.createdAt)}</Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="trophy-outline" size={20} color="#666" style={styles.icon} />
-          <Text style={styles.label}>Online Streak:</Text>
-          <Text style={styles.value}>{userData.onlineStreak !== undefined ? `${userData.onlineStreak} days` : 'N/A'}</Text>
+          <Text style={[styles.label, {color: theme.colors.text}]}>Online Streak:</Text>
+          <Text style={[styles.value, {color: theme.colors.text}]}>{userData.onlineStreak !== undefined ? `${userData.onlineStreak} days` : 'N/A'}</Text>
         </View>
         {userData.role !== undefined && (
           <View style={styles.infoRow}>
             <Ionicons name="briefcase-outline" size={20} color="#666" style={styles.icon} />
-            <Text style={styles.label}>Role:</Text>
-            <Text style={styles.value}>{userData.role === 0 ? 'User' : 'Admin'}</Text>
+            <Text style={[styles.label, {color: theme.colors.text}]}>Role:</Text>
+            <Text style={[styles.value, {color: theme.colors.text}]}>{userData.role === 0 ? 'User' : 'Admin'}</Text>
           </View>
         )}
         {userData.lastOnline && (
           <View style={styles.infoRow}>
             <Ionicons name="time-outline" size={20} color="#666" style={styles.icon} />
-            <Text style={styles.label}>Last Online:</Text>
-            <Text style={styles.value}>{formatDate(userData.lastOnline)}</Text>
+            <Text style={[styles.label, {color: theme.colors.text}]}>Last Online:</Text>
+            <Text style={[styles.value, {color: theme.colors.text}]}>{formatDate(userData.lastOnline)}</Text>
           </View>
         )}
       </View>
+
+      <TouchableOpacity onPress={toggleTheme} style={[styles.themeToggleButton, { backgroundColor: theme.colors.cardBackground }]}>
+        <Ionicons name={theme.colors.background === '#000000' ? "sunny-outline" : "moon-outline"} size={24} color={theme.colors.iconColor} />
+        <Text style={[styles.themeToggleButtonText, { color: theme.colors.text }]}>
+          Switch to {theme.colors.background === '#000000' ? 'Light' : 'Dark'} Mode
+        </Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.passwordButton} onPress={() => navigation.navigate('ChangePassword')}>
         <Ionicons name="lock-closed-outline" size={24} color="fff"/>
@@ -223,13 +232,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000',
   },
   loadingText: {
     marginTop: 10,
@@ -269,7 +276,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingVertical: 40,
-    backgroundColor: 'white',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     marginBottom: 20,
@@ -277,16 +283,13 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: 'black',
     marginTop: 10,
   },
   email: {
     fontSize: 16,
-    color: 'black',
     marginTop: 5,
   },
   infoCard: {
-    backgroundColor: '#1a1a1a',
     borderRadius: 15,
     marginHorizontal: 20,
     padding: 20,
@@ -311,12 +314,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#aaa',
     width: 120, 
   },
   value: {
     fontSize: 16,
-    color: '#fff',
     flexShrink: 1, 
   },
   logoutButton: {
@@ -341,9 +342,9 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 10,
     marginHorizontal: 20,
+    marginBottom: 15, 
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 30,
   },
   passwordText: {
     color: '#fff',
@@ -351,4 +352,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   }, 
+  themeToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginBottom: 15, 
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  themeToggleButtonText: {
+    marginLeft: 10,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
 });
