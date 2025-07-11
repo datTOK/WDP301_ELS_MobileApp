@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, FlatList, TouchableOpacity } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 
 export default function AchievementScreen() {
   const { userToken, userId } = useAuth();
@@ -12,6 +13,7 @@ export default function AchievementScreen() {
   const [size, setSize] = useState(5);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const { theme } = useTheme(); 
 
   useEffect(() => {
     if (userId && userToken) {
@@ -60,11 +62,11 @@ export default function AchievementScreen() {
   };
 
   const renderAchievementItem = ({ item }) => (
-    <View style={achievementStyles.achievementCard}>
+    <View style={[achievementStyles.achievementCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
       <Ionicons name="trophy" size={30} color="#FFD700" style={achievementStyles.medalIcon} />
       <View style={achievementStyles.achievementTextContainer}>
-        <Text style={achievementStyles.achievementName}>{item.achievement.name}</Text>
-        <Text style={achievementStyles.achievementDescription}>{item.achievement.description}</Text>
+        <Text style={[achievementStyles.achievementName, {color: theme.colors.primary}]}>{item.achievement.name}</Text>
+        <Text style={[achievementStyles.achievementDescription , { color: theme.colors.text }]}>{item.achievement.description}</Text>
         <Text style={achievementStyles.achievementDate}>Achieved on: {formatDate(item.createdAt)}</Text>
       </View>
     </View>
@@ -114,11 +116,18 @@ export default function AchievementScreen() {
   }
 
   return (
-    <View style={achievementStyles.container}>
-      <View style={{flex: 1, flexDirection: 'row' , justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={achievementStyles.title}>Your Achievements</Text>
-        <Ionicons name="happy" size={30} color="#FFD700" style={{ marginLeft: 10 }}/>
+    <View style={[achievementStyles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={[achievementStyles.title, {color: theme.colors.text}]}>Your Achievements</Text>
+        <Ionicons name="happy" size={30} color="#FFD700" style={{ marginLeft: 10 }} />
       </View>
+
+      {/* <LottieView
+        source={{ uri: 'https://lottie.host/67eae408-eed7-4ae8-b53f-2cc54bf08e00/47pdFgUoVq.json' }}
+        autoPlay
+        loop
+        style={{ width: 600, height: 200, alignSelf: 'center' }} /> */}
+
       <FlatList
         data={achievements}
         renderItem={renderAchievementItem}
@@ -191,7 +200,6 @@ const achievementStyles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
     textAlign: 'center',
     marginBottom: 25,
     marginTop: 20,
@@ -223,12 +231,10 @@ const achievementStyles = StyleSheet.create({
   achievementName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CC2FF',
     marginBottom: 5,
   },
   achievementDescription: {
     fontSize: 14,
-    color: '#ccc',
     marginBottom: 5,
   },
   achievementDate: {

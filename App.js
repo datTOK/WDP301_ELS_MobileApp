@@ -3,14 +3,15 @@ import { StyleSheet, View, ActivityIndicator, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { AuthProvider, useAuth } from './context/AuthContext'; 
-
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { TabNavigator, AuthStackScreen, ProfileStackScreen } from './navigation/Navigator';
 
 const RootStack = createNativeStackNavigator();
 
 function RootNavigatorContent() {
   const { userToken, isLoading } = useAuth();
+  const { theme } = useTheme();
 
   if (isLoading) {
     return (
@@ -35,29 +36,37 @@ function RootNavigatorContent() {
   );
 }
 
+function AppContent() {
+  const { theme } = useTheme();
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <NavigationContainer>
+        <RootNavigatorContent />
+      </NavigationContainer>
+      <StatusBar style={theme.statusBarStyle} />
+    </View>
+  );
+}
+
 export default function App() {
   return (
-    <View style={styles.container}>
+    <ThemeProvider>
       <AuthProvider>
-        <NavigationContainer>
-          <RootNavigatorContent /> 
-        </NavigationContainer>
+        <AppContent />
       </AuthProvider>
-      <StatusBar style="auto" />
-    </View>
+    </ThemeProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000000',
   },
   loadingText: {
     color: '#fff',

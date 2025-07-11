@@ -1,4 +1,3 @@
-// screens/HomeScreen.js
 import { Text, View, StyleSheet, Alert, Dimensions, Image, TouchableOpacity, ScrollView } from 'react-native';
 import React, { useEffect } from 'react';
 import TopBar from '../components/Topbar';
@@ -8,13 +7,14 @@ import { useAuth } from '.././context/AuthContext';
 import Swiper from 'react-native-swiper';
 import { Divider } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
-// import LottieView from 'lottie-react-native';
+import { useTheme } from '../context/ThemeContext'; 
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const navigation = useNavigation();
-  const { signOut } = useAuth();
+  const { theme } = useTheme(); 
+
   const imageUrls = [
     'https://images.pexels.com/photos/5652121/pexels-photo-5652121.jpeg',
     'https://images.pexels.com/photos/256417/pexels-photo-256417.jpeg',
@@ -26,7 +26,7 @@ export default function HomeScreen() {
   }, [navigation]);
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <TopBar />
       <View style={styles.swiperContainer}>
         <Swiper
@@ -35,7 +35,7 @@ export default function HomeScreen() {
           showsPagination={true}
           loop
           dotStyle={styles.paginationDot}
-          activeDotStyle={styles.activePaginationDot}
+          activeDotStyle={[styles.activePaginationDot, { backgroundColor: theme.colors.text }]} 
         >
           {imageUrls.map((url, index) => (
             <Image
@@ -48,33 +48,27 @@ export default function HomeScreen() {
         </Swiper>
       </View>
 
-      <Divider style={styles.sectionDivider} />
+      <Divider style={[styles.sectionDivider, { backgroundColor: theme.colors.borderColor }]} />
 
       <View style={styles.whyChooseSection}>
-        <Text style={styles.sectionTitle}>Why Choose ELS?</Text>
-        <View style={styles.featureCard}>
-          <Ionicons name="bulb-outline" size={30} color={'blue'} style={styles.featureIcon} />
-          <Text style={styles.featureText}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Why Choose ELS?</Text>
+        <View style={[styles.featureCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
+          <Ionicons name="bulb-outline" size={30} color={theme.colors.primary} style={styles.featureIcon} />
+          <Text style={[styles.featureText, { color: theme.colors.text }]}>
             ELS is one of the most chosen English learning apps in Vietnam and continues to grow largely.
             We provide engaging lessons, interactive exercises, and a supportive community.
           </Text>
         </View>
-        <View style={styles.featureCard}>
+        <View style={[styles.featureCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
           <Ionicons name="medal" size={30} color={'yellow'} style={styles.featureIcon} />
-          <Text style={styles.featureText}>
+          <Text style={[styles.featureText, { color: theme.colors.text }]}>
             Achieve fluency faster with our proven methodology and personalized learning paths.
             Join thousands of successful learners today!
           </Text>
         </View>
       </View>
 
-      {/* <LottieView
-        source={{ uri: 'https://lottie.host/b22b0b33-5217-4083-b718-c41b5563be1a/iFbVypvZql.json' }}
-        autoPlay
-        loop
-        style={{ width: 600, height: 200, alignSelf: 'center' }} /> */}
-
-      <TouchableOpacity style={styles.callToActionCard} onPress={() => navigation.navigate('Courses')}>
+      <TouchableOpacity style={[styles.callToActionCard, { backgroundColor: theme.colors.primary }]} onPress={() => navigation.navigate('Courses')}>
         <Text style={styles.callToActionText}>Explore Our Courses!</Text>
         <Ionicons name="arrow-forward-outline" size={24} color={'white'} />
       </TouchableOpacity>
@@ -85,19 +79,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F8F8',
-  },
-  board: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 10,
-    margin: 20,
-  },
-  miniBoard: {
-    backgroundColor: '#4CC2FF',
-    padding: 20,
-    borderRadius: 5,
-    marginTop: 5,
   },
   swiperContainer: {
     height: 200,
@@ -127,7 +108,6 @@ const styles = StyleSheet.create({
     marginBottom: -5,
   },
   activePaginationDot: {
-    backgroundColor: 'white',
     width: 10,
     height: 10,
     borderRadius: 5,
@@ -137,7 +117,6 @@ const styles = StyleSheet.create({
     marginBottom: -5,
   },
   sectionDivider: {
-    backgroundColor: 'gray',
     height: 1,
     marginTop: 30,
     width: '90%',
@@ -151,12 +130,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: 'gray',
     marginBottom: 15,
     textAlign: 'center',
   },
   featureCard: {
-    backgroundColor: 'white',
     padding: 18,
     borderRadius: 12,
     marginBottom: 15,
@@ -167,18 +144,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1, 
   },
   featureIcon: {
     marginRight: 10,
   },
   featureText: {
     fontSize: 15,
-    color: 'gray',
     lineHeight: 22,
     flex: 1,
   },
   callToActionCard: {
-    backgroundColor: 'blue', // Use primary color
     paddingVertical: 18,
     paddingHorizontal: 20,
     marginHorizontal: 20,
@@ -187,7 +163,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 10,
     marginBottom: 20,
-    shadowColor: 'blue',
+    shadowColor: 'blue', 
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -199,5 +175,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginRight: 5,
+  },
+  themeToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    marginVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#eee', 
+    marginHorizontal: 20,
+  },
+  themeToggleButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
