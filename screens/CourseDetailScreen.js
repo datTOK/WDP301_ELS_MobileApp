@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
-const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted }) => {
+const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted, isLessonCompleted = false }) => {
   const [userAnswer, setUserAnswer] = useState('');
   const [selectedOption, setSelectedOption] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -30,13 +30,23 @@ const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted }) => {
 
   // Reset exercise state when exercise changes
   useEffect(() => {
-    setUserAnswer('');
-    setSelectedOption('');
-    setIsSubmitted(false);
-    setIsCorrect(false);
-    setShowFeedback(false);
-    setShowAnswer(false);
-  }, [exercise._id]);
+    if (isLessonCompleted) {
+      // If lesson is completed, show all exercises as completed
+      setUserAnswer(exercise.answer[0] || exercise.answer);
+      setSelectedOption(exercise.answer[0] || exercise.answer);
+      setIsSubmitted(true);
+      setIsCorrect(true);
+      setShowFeedback(false);
+      setShowAnswer(false);
+    } else {
+      setUserAnswer('');
+      setSelectedOption('');
+      setIsSubmitted(false);
+      setIsCorrect(false);
+      setShowFeedback(false);
+      setShowAnswer(false);
+    }
+  }, [exercise._id, isLessonCompleted]);
 
   const validateAnswer = (userAnswer, correctAnswer) => {
     if (Array.isArray(correctAnswer)) {
@@ -135,6 +145,12 @@ const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted }) => {
 
   return (
     <View style={exerciseItemStyles.container}>
+      {isLessonCompleted && (
+        <View style={exerciseItemStyles.completedIndicator}>
+          <Ionicons name="checkmark-circle" size={20} color="#28a745" />
+          <Text style={exerciseItemStyles.completedIndicatorText}>Lesson Completed - Review Mode</Text>
+        </View>
+      )}
       <View style={exerciseItemStyles.questionContainer}>
         <Text style={exerciseItemStyles.questionText}>{exercise.question}</Text>
       </View>
@@ -150,8 +166,8 @@ const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted }) => {
                 isSubmitted && option === exercise.answer[0] && exerciseItemStyles.correctOption,
                 isSubmitted && selectedOption === option && option !== exercise.answer[0] && exerciseItemStyles.incorrectOption,
               ]}
-              onPress={() => !isSubmitted && setSelectedOption(option)}
-              disabled={isSubmitted}
+              onPress={() => !isSubmitted && !isLessonCompleted && setSelectedOption(option)}
+              disabled={isSubmitted || isLessonCompleted}
             >
               <Text style={[
                 exerciseItemStyles.optionText,
@@ -175,7 +191,7 @@ const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted }) => {
             placeholderTextColor="#888"
             value={userAnswer}
             onChangeText={setUserAnswer}
-            editable={!isSubmitted}
+            editable={!isSubmitted && !isLessonCompleted}
             multiline={false}
           />
         </View>
@@ -208,7 +224,7 @@ const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted }) => {
               buttonStyle={exerciseItemStyles.submitButton}
               titleStyle={exerciseItemStyles.submitButtonText}
               onPress={checkAnswer}
-              disabled={isSubmitting || (!userAnswer.trim() && !selectedOption)}
+              disabled={isSubmitting || (!userAnswer.trim() && !selectedOption) || isLessonCompleted}
             />
             <Button
               title="See Answer"
@@ -224,6 +240,7 @@ const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted }) => {
               buttonStyle={exerciseItemStyles.tryAgainButton}
               titleStyle={exerciseItemStyles.tryAgainButtonText}
               onPress={resetExercise}
+              disabled={isLessonCompleted}
             />
             <Button
               title="See Answer"
@@ -357,6 +374,13 @@ const CourseDetailScreen = ({ route, navigation }) => {
   // Mark lesson as completed (only if all exercises are correct)
   const markLessonCompleted = async (lessonId) => {
     console.log("Lesson ID: ", lessonId);
+    
+    // Check if lesson is already completed from API
+    if (userLesson?.completed) {
+      Alert.alert('Already Completed', 'This lesson has already been completed. You can review the content but cannot mark it as completed again.');
+      return;
+    }
+    
     if (!isLessonFullyCompleted()) {
       Alert.alert('Incomplete', 'Please complete all exercises correctly before marking this lesson as completed.');
       return;
@@ -386,7 +410,9 @@ const CourseDetailScreen = ({ route, navigation }) => {
       });
       if (getRes.ok) {
         const userLessonData = await getRes.json();
+        console.log('Fetched user lesson data:', userLessonData);
         setUserLesson(userLessonData.userLesson || null);
+        console.log('Lesson completion status:', userLessonData.userLesson?.completed);
         return userLessonData.userLesson;
       } else {
         // If not found, create it
@@ -403,7 +429,9 @@ const CourseDetailScreen = ({ route, navigation }) => {
         });
         const result = await response.json();
         if (response.ok) {
+          console.log('Created user lesson data:', result);
           setUserLesson(result.userLesson || null);
+          console.log('New lesson completion status:', result.userLesson?.completed);
           return result.userLesson;
         } else {
           setUserLesson(null);
@@ -411,6 +439,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
         }
       }
     } catch (error) {
+      console.log('Error in fetchOrCreateUserLesson:', error);
       setUserLesson(null);
       return null;
     }
@@ -560,7 +589,12 @@ const CourseDetailScreen = ({ route, navigation }) => {
         )}
         {modalType === 'exercise' && (
           <View style={styles.modalBody}>
-            <ExerciseItem exercise={item} onSubmission={handleExerciseSubmission} onExerciseCompleted={handleExerciseCompletion} />
+            <ExerciseItem 
+              exercise={item} 
+              onSubmission={handleExerciseSubmission} 
+              onExerciseCompleted={handleExerciseCompletion}
+              isLessonCompleted={userLesson?.completed}
+            />
           </View>
         )}
         <Button title="Close" onPress={closeModal} buttonStyle={styles.closeModalButton} />
@@ -575,6 +609,12 @@ const CourseDetailScreen = ({ route, navigation }) => {
       contentContainerStyle={styles.lessonContentScrollContainer}
       showsVerticalScrollIndicator={false}
     >
+      {userLesson?.completed && (
+        <View style={styles.lessonCompletedBanner}>
+          <Ionicons name="checkmark-circle" size={24} color="#fff" />
+          <Text style={styles.lessonCompletedText}>Lesson Completed - Review Mode</Text>
+        </View>
+      )}
       <Card containerStyle={styles.card}>
         <Card.Title style={styles.cardTitle}>{lesson.name}</Card.Title>
         <Text style={styles.description}>{lesson.description}</Text>
@@ -586,14 +626,14 @@ const CourseDetailScreen = ({ route, navigation }) => {
         {lesson.exercises && lesson.exercises.length > 0 && (
           <View style={styles.progressContainer}>
             <Text style={styles.progressText}>
-              Exercises Progress: {Object.values(completedExercises).filter(correct => correct).length} / {lesson.exercises.length} completed
+              Exercises Progress: {userLesson?.completed ? lesson.exercises.length : Object.values(completedExercises).filter(correct => correct).length} / {lesson.exercises.length} completed
             </Text>
             <View style={styles.progressBar}>
               <View
                 style={[
                   styles.progressFill,
                   {
-                    width: `${(Object.values(completedExercises).filter(correct => correct).length / lesson.exercises.length) * 100}%`
+                    width: `${userLesson?.completed ? 100 : (Object.values(completedExercises).filter(correct => correct).length / lesson.exercises.length) * 100}%`
                   }
                 ]}
               />
@@ -602,10 +642,10 @@ const CourseDetailScreen = ({ route, navigation }) => {
         )}
       </Card>
       <Button
-        title={completedLessons.includes(lesson._id) ? 'Completed' : (isLessonFullyCompleted() ? ('Mark as Completed') : 'Complete All Exercises')}
-        buttonStyle={completedLessons.includes(lesson._id) ? styles.completedButton : (isLessonFullyCompleted() ? styles.completeButton : styles.incompleteButton)}
+        title={userLesson?.completed ? 'Lesson Completed' : (isLessonFullyCompleted() ? 'Mark as Completed' : 'Complete All Exercises')}
+        buttonStyle={userLesson?.completed ? styles.completedButton : (isLessonFullyCompleted() ? styles.completeButton : styles.incompleteButton)}
         onPress={() => markLessonCompleted(lessonId)}
-        disabled={completedLessons.includes(lesson._id) || !isLessonFullyCompleted()}
+        disabled={userLesson?.completed || !isLessonFullyCompleted()}
       />
       <Overlay
         isVisible={modalVisible}
@@ -1037,6 +1077,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     borderRadius: 4,
   },
+  lessonCompletedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#28a745',
+    padding: 12,
+    margin: 10,
+    borderRadius: 8,
+  },
+  lessonCompletedText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
 });
 
 const exerciseItemStyles = StyleSheet.create({
@@ -1045,6 +1100,20 @@ const exerciseItemStyles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#333',
     borderRadius: 8,
+  },
+  completedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#28a745',
+    padding: 8,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  completedIndicatorText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
   questionContainer: {
     marginBottom: 10,
