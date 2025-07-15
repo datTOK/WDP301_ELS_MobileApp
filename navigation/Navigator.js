@@ -12,10 +12,11 @@ import LoginScreen from '../screens/Auth/LoginScreen';
 import SignupScreen from '../screens/Auth/SignupScreen';
 import BlogDetailScreen from '../screens/BlogDetailScreen';
 import ChangePasswordScreen from '../screens/Auth/ChangePasswordScreen';
-// import MyCoursesScreen from '../screens/MyCoursesScreen';
 import CourseDetailScreen from '../screens/CourseDetailScreen';
 import CourseOverviewScreen from '../screens/CourseOverviewScreen';
 import CourseLessonScreen from '../screens/CourseLessonScreen';
+import TestScreen from '../screens/TestScreen';
+import TestScreenDetail from '../screens/TestScreenDetail';
 import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
@@ -74,7 +75,7 @@ function CoursesStackScreen() {
         name="CourseLesson"
         component={CourseLessonScreen}
         options={{
-          headerShown: true,
+          headerShown: false,
           headerTitle: 'Lesson',
         }}
       />
@@ -82,8 +83,24 @@ function CoursesStackScreen() {
         name="CourseDetail"
         component={CourseDetailScreen}
         options={{
-          headerShown: true,
+          headerShown: false,
           headerTitle: 'Course Details',
+        }}
+      />
+      <Stack.Screen
+        name="TestScreen"
+        component={TestScreen}
+        options={{
+          headerShown: false,
+          headerTitle: 'Course Tests',
+        }}
+      />
+      <Stack.Screen
+        name="TestScreenDetail"
+        component={TestScreenDetail}
+        options={{
+          headerShown: true,
+          headerTitle: 'Take Test',
         }}
       />
     </Stack.Navigator>

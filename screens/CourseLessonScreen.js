@@ -58,23 +58,24 @@ const CourseLessonScreen = ({ route, navigation }) => {
     try {
       const completionPromises = lessonsData.map(async (lesson) => {
         try {
-          console.log('Lessons:', lessonsData);
           const response = await fetch(`${API_BASE_URL}/user-lessons/${lesson._id}/lesson`, {
             headers: { 'Authorization': `Bearer ${userToken}` },
           });
 
           if (response.ok) {
             const data = await response.json();
-            console.log("Data:", data);
+            // Use userLesson.status and userLesson.currentOrder from API
             return {
-              lessonId: data.userLesson?.id,
+              lessonId: lesson._id,
               completed: data.userLesson?.status === 'completed',
+              currentOrder: data.userLesson?.currentOrder || [],
+              status: data.userLesson?.status || 'ongoing',
             };
           }
-          return { lessonId: lesson._id, completed: false };
+          return { lessonId: lesson._id, completed: false, currentOrder: [], status: 'not_started' };
         } catch (error) {
           console.log('Error fetching user lesson status:', error);
-          return { lessonId: lesson._id, completed: false };
+          return { lessonId: lesson._id, completed: false, currentOrder: [], status: 'not_started' };
         }
       });
 
@@ -82,14 +83,12 @@ const CourseLessonScreen = ({ route, navigation }) => {
       const progressData = {};
       const completedIds = [];
 
-      completionResults.forEach(({ lessonId, completed }) => {
-        progressData[lessonId] = { completed };
+      completionResults.forEach(({ lessonId, completed, currentOrder, status }) => {
+        progressData[lessonId] = { completed, currentOrder, status };
         if (completed) {
           completedIds.push(lessonId);
         }
       });
-      console.log("Progess Data:", progressData);
-      console.log("Completion Results:", completionResults);
       setLessonProgress(progressData);
       setCompletedLessons(completedIds);
     } catch (error) {
