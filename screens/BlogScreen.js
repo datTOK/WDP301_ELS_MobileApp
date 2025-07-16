@@ -15,12 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import TopBar from '../components/Topbar'
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Image } from 'react-native-elements';
+import { MOBILE_SERVER_URL } from '@env'; 
 
 const stripHtmlTags = (htmlString) => {
   return htmlString ? htmlString.replace(/<[^>]*>/g, '').trim() : '';
 };
-
-const API_BASE_URL = 'http://localhost:4000/api/blogs';
 
 const BlogItem = ({ blog, navigation }) => {
   const plainTextContent = stripHtmlTags(blog.content);
@@ -164,7 +163,7 @@ export default function BlogScreen({navigation}) {
         queryParams.append('search', debouncedSearch);
       }
 
-      const url = `${API_BASE_URL}?${queryParams.toString()}`;
+      const url = `${MOBILE_SERVER_URL}api/blogs?${queryParams.toString()}`;
       console.log('Fetching from URL:', url);
 
       const response = await fetch(url, {

@@ -6,9 +6,7 @@ import { Image } from 'react-native-elements'
 import { Ionicons } from '@expo/vector-icons'; 
 import { useAuth } from '../context/AuthContext'; 
 import RenderHtml from 'react-native-render-html'; 
-
-// Base URL for your API
-const API_BASE_URL = 'http://localhost:4000/api/blogs';
+import { MOBILE_SERVER_URL } from '@env'; 
 
 export default function BlogDetailScreen({ route, navigation }) {
   const { blogId } = route.params;
@@ -32,7 +30,7 @@ export default function BlogDetailScreen({ route, navigation }) {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/${blogId}`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/blogs/${blogId}`, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${userToken}`, 

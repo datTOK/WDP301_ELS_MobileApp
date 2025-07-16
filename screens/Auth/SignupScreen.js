@@ -34,7 +34,7 @@ export default function SignupScreen({ navigation }) {
 
     console.log('Attempting signup with:', { name, email, password });
     try {
-      const response = await fetch('http://localhost:4000/api/auth/signup', {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

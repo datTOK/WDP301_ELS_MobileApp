@@ -14,8 +14,7 @@ import { Card, Button, Overlay } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = 'http://localhost:4000/api';
+import { MOBILE_SERVER_URL } from '@env';
 
 const TestScreenDetail = ({ route, navigation }) => {
   const { testId, testName } = route.params;
@@ -50,7 +49,7 @@ const TestScreenDetail = ({ route, navigation }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/tests/${testId}`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/tests/${testId}`, {
         headers: { 'Authorization': `Bearer ${userToken}` },
       }); 
       const data = await response.json();
@@ -66,7 +65,7 @@ const TestScreenDetail = ({ route, navigation }) => {
 
   const fetchUserTest = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/user-tests/${testId}/test`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/user-tests/${testId}/test`, {
         headers: { 'Authorization': `Bearer ${userToken}` },
       });
       if (response.ok) {
@@ -104,7 +103,7 @@ const TestScreenDetail = ({ route, navigation }) => {
           selectedAnswers: answers[q._id],
         })),
       };
-      const response = await fetch(`${API_BASE_URL}/tests/${testId}/submission`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/tests/${testId}/submission`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

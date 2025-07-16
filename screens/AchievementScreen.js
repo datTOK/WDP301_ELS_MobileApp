@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Alert, FlatList, TouchableOp
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
+import { MOBILE_SERVER_URL } from '@env';
 
 export default function AchievementScreen() {
   const { userToken, userId } = useAuth();
@@ -33,7 +34,7 @@ export default function AchievementScreen() {
       }
 
       console.log(`Fetching achievements for user ID: ${userId}, Page: ${page}, Size: ${size}`);
-      const response = await fetch(`http://localhost:4000/api/user-achievements/${userId}/users?page=${page}&size=${size}`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/user-achievements/${userId}/users?page=${page}&size=${size}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',

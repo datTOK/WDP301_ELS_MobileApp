@@ -11,8 +11,8 @@ import {
 import { Card, Button, Icon, Overlay, Chip } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { MOBILE_SERVER_URL } from '@env';
 
-const API_BASE_URL = 'http://localhost:4000/api';
 
 const TestItem = ({ test, isReadOnly = true }) => {
   const [showAnswer, setShowAnswer] = useState(false);
@@ -100,7 +100,7 @@ const TestScreen = ({ route, navigation }) => {
     try {
       console.log('Fetching tests for courseId:', courseId);
       
-      const response = await fetch(`${API_BASE_URL}/tests/${courseId}/course`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/tests/${courseId}/course`, {
         headers: { 'Authorization': `Bearer ${userToken}` },
       });
 

@@ -4,6 +4,7 @@ import { View, Text, TextInput, StyleSheet, Alert, Image, TouchableOpacity, Icon
 import { Button } from 'react-native-elements';
 import { useAuth } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { MOBILE_SERVER_URL } from '@env';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -14,7 +15,7 @@ export default function LoginScreen({ navigation }) {
   const handleLogin = async () => {
     console.log('Attempting login with:', { email, password });
     try {
-      const response = await fetch('http://localhost:4000/api/auth/login', {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

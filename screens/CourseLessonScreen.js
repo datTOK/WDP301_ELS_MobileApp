@@ -12,6 +12,7 @@ import { Card, Button, Icon } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MOBILE_SERVER_URL } from '@env';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -32,7 +33,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/lessons`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/courses/${courseId}/lessons`, {
         headers: { 'Authorization': `Bearer ${userToken}` },
       });
 
@@ -58,7 +59,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
     try {
       const completionPromises = lessonsData.map(async (lesson) => {
         try {
-          const response = await fetch(`${API_BASE_URL}/user-lessons/${lesson._id}/lesson`, {
+          const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons/${lesson._id}/lesson`, {
             headers: { 'Authorization': `Bearer ${userToken}` },
           });
 
@@ -98,7 +99,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
 
   const updateLessonStatus = async (lessonId, status) => {
     try {
-      const lessonResponse = await fetch(`${API_BASE_URL}/user-lessons/${lessonId}/lesson`, {
+      const lessonResponse = await fetch(`${MOBILE_SERVER_URL}api/user-lessons/${lessonId}/lesson`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userToken}`,
@@ -106,7 +107,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
       });
       const lessonData = await lessonResponse.json();
 
-      const response = await fetch(`${API_BASE_URL}/user-lessons/${lessonData?.userLesson?._id}`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons/${lessonData?.userLesson?._id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
