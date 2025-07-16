@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Image } from 'react-native-elements';
+import { MOBILE_SERVER_URL } from '@env';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -26,7 +27,7 @@ const MyCoursesScreen = ({ navigation }) => {
       console.log('Starting fetchMyCourses with userId:', userId, 'userToken:', userToken);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/user-courses`, {
+        const response = await fetch(`${MOBILE_SERVER_URL}api/user-courses`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Bearer ${userToken}`,
@@ -55,7 +56,7 @@ const MyCoursesScreen = ({ navigation }) => {
         const courseDetails = await Promise.all(
           enrolledCourses.map(async (userCourse) => {
             console.log('Fetching course details for courseId:', userCourse.courseId);
-            const courseResponse = await fetch(`${API_BASE_URL}/courses/${userCourse.courseId}`, {
+            const courseResponse = await fetch(`${MOBILE_SERVER_URL}api/courses/${userCourse.courseId}`, {
               headers: {
                 'Accept': 'application/json',
                 'Authorization': `Bearer ${userToken}`,

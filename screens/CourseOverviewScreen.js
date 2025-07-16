@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { MOBILE_SERVER_URL } from '@env';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -52,19 +53,19 @@ const CourseOverviewScreen = ({ route, navigation }) => {
         setError(null);
         try {
             // First, check enrollment status
-            const enrollmentResponse = await fetch(`${API_BASE_URL}/user-courses/${courseId}/course`, {
+            const enrollmentResponse = await fetch(`${MOBILE_SERVER_URL}api/user-courses/${courseId}/course`, {
                 headers: { 'Authorization': `Bearer ${userToken}` },
             });
             
             // Fetch course info, lessons, and tests regardless of enrollment
             const [courseResponse, lessonsResponse, testsResponse] = await Promise.all([
-                fetch(`${API_BASE_URL}/courses/${courseId}`, {
+                fetch(`${MOBILE_SERVER_URL}api/courses/${courseId}`, {
                     headers: { 'Authorization': `Bearer ${userToken}` },
                 }),
-                fetch(`${API_BASE_URL}/courses/${courseId}/lessons`, {
+                fetch(`${MOBILE_SERVER_URL}api/courses/${courseId}/lessons`, {
                     headers: { 'Authorization': `Bearer ${userToken}` },
                 }),
-                fetch(`${API_BASE_URL}/tests/${courseId}/course`, {
+                fetch(`${MOBILE_SERVER_URL}api/tests/${courseId}/course`, {
                     headers: { 'Authorization': `Bearer ${userToken}` },
                 })
             ]);
@@ -113,7 +114,7 @@ const CourseOverviewScreen = ({ route, navigation }) => {
                 // Fetch user lesson progress using the same logic as CourseLessonScreen
                 const completionPromises = lessonsData.map(async (lesson) => {
                     try {
-                        const response = await fetch(`${API_BASE_URL}/user-lessons/${lesson._id}/lesson`, {
+                        const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons/${lesson._id}/lesson`, {
                             headers: { 'Authorization': `Bearer ${userToken}` },
                         });
 
@@ -178,7 +179,7 @@ const CourseOverviewScreen = ({ route, navigation }) => {
         }
         setEnrollLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/user-courses`, {
+            const response = await fetch(`${MOBILE_SERVER_URL}api/user-courses`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

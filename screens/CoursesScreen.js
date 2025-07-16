@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, SearchBar } from 'react-native-elements';
+import { MOBILE_SERVER_URL } from '@env';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -128,7 +129,7 @@ export default function CoursesScreen({ navigation }) {
         queryParams.append('search', debouncedSearch);
       }
 
-      const url = `${API_BASE_URL}/courses?${queryParams.toString()}`;
+      const url = `${MOBILE_SERVER_URL}api/courses?${queryParams.toString()}`;
       const response = await fetch(url, {
         headers: {
           Accept: 'application/json',

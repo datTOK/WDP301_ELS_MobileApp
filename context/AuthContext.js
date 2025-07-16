@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useMemo, useContext, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { MOBILE_SERVER_URL } from '@env';
 
 export const AuthContext = createContext();
 
@@ -12,7 +13,7 @@ export const AuthProvider = ({ children }) => {
   const fetchAndSetUserProfile = useCallback(async (token) => {
     try {
       console.log('AuthContext: Attempting to fetch user profile for ID and full user data...');
-      const response = await fetch('http://localhost:4000/api/auth/me', {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/auth/me`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',

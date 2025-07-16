@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Avatar } from 'react-native-elements';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext'; 
+import { MOBILE_SERVER_URL } from '@env';
 
 export default function ProfileScreen() {
   const [userData, setUserData] = useState(null);
@@ -35,7 +36,7 @@ export default function ProfileScreen() {
       console.log('ProfileScreen: User Token being sent:', userToken);
       console.log('ProfileScreen: User ID being used:', userId);
       console.log('ProfileScreen: Fetching user profile...');
-      const response = await fetch('http://localhost:4000/api/auth/me', {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/auth/me`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -75,7 +76,7 @@ export default function ProfileScreen() {
 
       if (userToken) {
         console.log('Making API call to /api/auth/logout with token...');
-        const response = await fetch('http://localhost:4000/api/auth/logout', {
+        const response = await fetch(`${MOBILE_SERVER_URL}api/auth/logout`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -14,8 +14,7 @@ import { Card, Button, Icon, Overlay, Chip } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const API_BASE_URL = 'http://localhost:4000/api';
+import { MOBILE_SERVER_URL } from '@env';
 
 const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted, isLessonCompleted = false }) => {
   const [userAnswer, setUserAnswer] = useState('');
@@ -78,7 +77,7 @@ const ExerciseItem = ({ exercise, onSubmission, onExerciseCompleted, isLessonCom
       setIsSubmitted(true);
       setShowFeedback(true);
 
-      const response = await fetch(`${API_BASE_URL}/user-exercises/submission`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/user-exercises/submission`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -340,7 +339,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
   const createUserLesson = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
-      const response = await fetch(`${API_BASE_URL}/user-lessons`, {
+      const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -405,7 +404,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
     try {
       const userId = await AsyncStorage.getItem('userId');
       // Try to fetch userLesson first
-      const getRes = await fetch(`${API_BASE_URL}/user-lessons/${lessonId}`, {
+      const getRes = await fetch(`${MOBILE_SERVER_URL}api/user-lessons/${lessonId}`, {
         headers: { 'Authorization': `Bearer ${userToken}` },
       });
       if (getRes.ok) {
@@ -416,7 +415,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
         return userLessonData.userLesson;
       } else {
         // If not found, create it
-        const response = await fetch(`${API_BASE_URL}/user-lessons`, {
+        const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -456,19 +455,19 @@ const CourseDetailScreen = ({ route, navigation }) => {
       await fetchOrCreateUserLesson();
 
       const [lessonResponse, grammarResponse, vocabResponse, exerciseResponse, testsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/lessons/${lessonId}`, {
+        fetch(`${MOBILE_SERVER_URL}api/lessons/${lessonId}`, {
           headers: { 'Authorization': `Bearer ${userToken}` },
         }),
-        fetch(`${API_BASE_URL}/lessons/${lessonId}/grammars`, {
+        fetch(`${MOBILE_SERVER_URL}api/lessons/${lessonId}/grammars`, {
           headers: { 'Authorization': `Bearer ${userToken}` },
         }),
-        fetch(`${API_BASE_URL}/lessons/${lessonId}/vocabularies`, {
+        fetch(`${MOBILE_SERVER_URL}api/lessons/${lessonId}/vocabularies`, {
           headers: { 'Authorization': `Bearer ${userToken}` },
         }),
-        fetch(`${API_BASE_URL}/exercises/${lessonId}/lesson`, {
+        fetch(`${MOBILE_SERVER_URL}api/exercises/${lessonId}/lesson`, {
           headers: { 'Authorization': `Bearer ${userToken}` },
         }),
-        fetch(`${API_BASE_URL}/tests/${courseId}/course`, {
+        fetch(`${MOBILE_SERVER_URL}api/tests/${courseId}/course`, {
           headers: { 'Authorization': `Bearer ${userToken}` },
         }),
       ]);
