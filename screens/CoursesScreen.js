@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,83 +9,139 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
-import { Card, Button, SearchBar } from 'react-native-elements';
-import { MOBILE_SERVER_URL } from '@env';
+  Image,
+  Dimensions,
+  TouchableOpacity,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../context/AuthContext";
+import { Card, Button, SearchBar } from "react-native-elements";
+import { MOBILE_SERVER_URL } from "@env";
 
-const API_BASE_URL = 'http://localhost:4000/api';
+const { width } = Dimensions.get("window");
+const API_BASE_URL = "http://localhost:4000/api";
 
 const CourseItem = ({ course, navigation }) => {
+  const [imageError, setImageError] = useState(false);
   return (
-    <Card containerStyle={courseItemStyles.card}>
-      <Card.Title style={courseItemStyles.title}>{course.name}</Card.Title>
-      <Card.Divider style={{ backgroundColor: 'white', height: 2, marginVertical: 10, width: '90%', marginHorizontal: 'auto' }} />
-      <Text style={courseItemStyles.contentSnippet} numberOfLines={2}>
-        {course.description}
-      </Text>
-      <Text style={courseItemStyles.date}>
-        Published: {new Date(course.createdAt).toLocaleDateString()}
-      </Text>
-      <Button
-        title="Read More"
-        buttonStyle={courseItemStyles.enrollButton}
-        titleStyle={courseItemStyles.enrollButtonText}
-        onPress={() => navigation.navigate('CourseOverview', { courseId: course._id })}
-      />
-    </Card>
+    <TouchableOpacity
+      style={courseItemStyles.cardContainer}
+      onPress={() =>
+        navigation.navigate("CourseOverview", { courseId: course._id })
+      }
+      activeOpacity={0.8}
+    >
+      <View style={courseItemStyles.card}>
+        <View style={courseItemStyles.imageContainer}>
+          <Image
+            source={
+              imageError || !course.coverImage
+                ? require("../assets/placeholder-course.jpg")
+                : { uri: course.coverImage }
+            }
+            onError={() => setImageError(true)}
+            style={courseItemStyles.courseImage}
+          />
+          <View style={courseItemStyles.overlay} />
+        </View>
+
+        <View style={courseItemStyles.contentContainer}>
+          <Text style={courseItemStyles.title} numberOfLines={2}>
+            {course.name}
+          </Text>
+
+          <Text style={courseItemStyles.description} numberOfLines={3}>
+            {course.description}
+          </Text>
+
+          <View style={courseItemStyles.footer}>
+            <View style={courseItemStyles.dateContainer}>
+              <Ionicons name="calendar-outline" size={14} color="#888" />
+              <Text style={courseItemStyles.date}>
+                {new Date(course.createdAt).toLocaleDateString()}
+              </Text>
+            </View>
+
+            <View style={courseItemStyles.readMoreContainer}>
+              <Text style={courseItemStyles.readMoreText}>Read More</Text>
+              <Ionicons name="arrow-forward" size={16} color="#007bff" />
+            </View>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 };
 
 const courseItemStyles = StyleSheet.create({
+  cardContainer: {
+    marginVertical: 8,
+    marginHorizontal: 16,
+  },
   card: {
-    borderRadius: 12,
-    marginVertical: 10,
-    marginHorizontal: 15,
-    padding: 0,
-    overflow: 'hidden',
-    backgroundColor: '#2a2a2a',
-    borderColor: '#333',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  imageContainer: {
+    position: "relative",
+    height: 180,
+  },
+  courseImage: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#f5f5f5",
+  },
+  overlay: {
+    display: "none",
+  },
+  contentContainer: {
+    padding: 20,
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    marginTop: 15,
-    paddingHorizontal: 15,
-    textAlign: 'center',
-    color: '#fff',
+    fontWeight: "700",
+    color: "#222",
+    marginBottom: 12,
+    lineHeight: 26,
   },
-  contentSnippet: {
-    fontSize: 14,
-    color: '#ccc',
-    lineHeight: 20,
-    marginBottom: 10,
-    paddingHorizontal: 15,
+  description: {
+    fontSize: 15,
+    color: "#444",
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dateContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   date: {
-    fontSize: 12,
-    color: '#aaa',
-    textAlign: 'right',
-    paddingHorizontal: 15,
-    marginBottom: 10,
+    fontSize: 13,
+    color: "#888",
+    fontWeight: "500",
   },
-  enrollButton: {
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    marginHorizontal: 15,
-    marginBottom: 15,
-    marginTop: 5,
+  readMoreContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
-  enrollButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  readMoreText: {
+    fontSize: 14,
+    color: "#007bff",
+    fontWeight: "600",
   },
 });
 
@@ -96,14 +152,14 @@ export default function CoursesScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
 
   const [page, setPage] = useState(1);
-  const [size] = useState(5); // Removed setSize as it’s not used
+  const [size] = useState(5);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const [order, setOrder] = useState('asc');
-  const [sortBy, setSortBy] = useState('date'); // Default to 'date'
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [order, setOrder] = useState("asc");
+  const [sortBy, setSortBy] = useState("date");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const { userToken } = useAuth();
 
@@ -126,13 +182,14 @@ export default function CoursesScreen({ navigation }) {
       });
 
       if (debouncedSearch) {
-        queryParams.append('search', debouncedSearch);
+        queryParams.append("search", debouncedSearch);
       }
 
       const url = `${MOBILE_SERVER_URL}api/courses?${queryParams.toString()}`;
+
       const response = await fetch(url, {
         headers: {
-          Accept: 'application/json',
+          Accept: "application/json",
           Authorization: `Bearer ${userToken}`,
         },
       });
@@ -149,14 +206,17 @@ export default function CoursesScreen({ navigation }) {
           setCourses([]);
           setTotal(0);
           setTotalPages(0);
-          Alert.alert('Data Error', result.message || 'Unexpected data structure.');
+          Alert.alert(
+            "Data Error",
+            result.message || "Unexpected data structure."
+          );
         }
       } else {
-        setError(result.message || 'Failed to fetch courses.');
+        setError(result.message || "Failed to fetch courses.");
         setCourses([]);
       }
     } catch (err) {
-      setError('Network error. Could not connect to the server.');
+      setError("Network error. Could not connect to the server.");
       setCourses([]);
     } finally {
       setLoading(false);
@@ -181,130 +241,204 @@ export default function CoursesScreen({ navigation }) {
     fetchCourses();
   }, [fetchCourses]);
 
+  const FilterButton = ({ title, isActive, onPress }) => (
+    <TouchableOpacity
+      style={[styles.filterButton, isActive && styles.activeFilterButton]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.filterButtonText,
+          isActive && styles.activeFilterButtonText,
+        ]}
+      >
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderFooter = () => (
     <View style={styles.paginationContainer}>
-      <Button
-        icon={<Ionicons name="arrow-back" size={20} color={page === 1 || loading ? 'gray' : '#fff'} />}
-        title="Previous"
-        type="clear"
-        titleStyle={[styles.paginationButtonText, page === 1 || loading ? { color: 'gray' } : { color: '#fff' }]}
+      <TouchableOpacity
+        style={[
+          styles.paginationButton,
+          (page === 1 || loading) && styles.disabledPaginationButton,
+        ]}
         disabled={page === 1 || loading}
         onPress={handlePreviousPage}
-        buttonStyle={styles.paginationButton}
-      />
-      <Text style={styles.pageInfo}>Page {page} of {totalPages}</Text>
-      <Button
-        iconRight
-        icon={<Ionicons name="arrow-forward" size={20} color={page === totalPages || loading ? 'gray' : '#fff'} />}
-        title="Next"
-        type="clear"
-        titleStyle={[styles.paginationButtonText, page === totalPages || loading ? { color: 'gray' } : { color: '#fff' }]}
+      >
+        <Ionicons
+          name="chevron-back"
+          size={20}
+          color={page === 1 || loading ? "#bbb" : "#222"}
+        />
+        <Text
+          style={[
+            styles.paginationButtonText,
+            (page === 1 || loading) && styles.disabledPaginationButtonText,
+          ]}
+        >
+          Previous
+        </Text>
+      </TouchableOpacity>
+
+      <View style={styles.pageIndicator}>
+        <Text style={styles.pageInfo}>
+          {page} of {totalPages}
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        style={[
+          styles.paginationButton,
+          (page === totalPages || loading) && styles.disabledPaginationButton,
+        ]}
         disabled={page === totalPages || loading}
         onPress={handleNextPage}
-        buttonStyle={styles.paginationButton}
-      />
+      >
+        <Text
+          style={[
+            styles.paginationButtonText,
+            (page === totalPages || loading) &&
+              styles.disabledPaginationButtonText,
+          ]}
+        >
+          Next
+        </Text>
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={page === totalPages || loading ? "#bbb" : "#222"}
+        />
+      </TouchableOpacity>
     </View>
   );
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={styles.container}>
-        <View style={styles.controlsContainer}>
-          <SearchBar
-            platform="default"
-            placeholder="Search courses by title/content..."
-            onChangeText={setSearch}
-            value={search}
-            containerStyle={styles.searchBarContainer}
-            inputContainerStyle={styles.searchBarInputContainer}
-            inputStyle={styles.searchBarInput}
-            searchIcon={{ size: 20, color: '#888' }}
-            clearIcon={search ? { name: 'close', onPress: () => setSearch('') } : null}
-            lightTheme={false}
-          />
-          <View style={styles.sortFilterSection}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Courses</Text>
+        <Text style={styles.headerSubtitle}>
+          {total} course{total !== 1 ? "s" : ""} available
+        </Text>
+      </View>
+
+      <View style={styles.controlsContainer}>
+        <SearchBar
+          platform="default"
+          placeholder="Search courses..."
+          onChangeText={setSearch}
+          value={search}
+          containerStyle={styles.searchBarContainer}
+          inputContainerStyle={styles.searchBarInputContainer}
+          inputStyle={styles.searchBarInput}
+          searchIcon={{ size: 20, color: "#007bff" }}
+          clearIcon={
+            search
+              ? {
+                  name: "close",
+                  onPress: () => setSearch(""),
+                  color: "#007bff",
+                }
+              : null
+          }
+          lightTheme={false}
+        />
+
+        <View style={styles.filtersContainer}>
+          <View style={styles.filterGroup}>
+            <Text style={styles.filterLabel}>Sort by</Text>
             <View style={styles.filterRow}>
-              <Text style={styles.label}>Sort By:</Text>
-              <Button
+              <FilterButton
                 title="Date"
-                type={sortBy === 'date' ? 'solid' : 'outline'}
-                buttonStyle={[styles.sortButton, sortBy === 'date' && styles.activeSortButton]}
-                titleStyle={[styles.sortButtonText, sortBy === 'date' && styles.activeSortButtonText]}
+                isActive={sortBy === "date"}
                 onPress={() => {
-                  setSortBy('date');
+                  setSortBy("date");
                   setPage(1);
                 }}
               />
-              <Button
+              <FilterButton
                 title="Title"
-                type={sortBy === 'title' ? 'solid' : 'outline'}
-                buttonStyle={[styles.sortButton, sortBy === 'title' && styles.activeSortButton]}
-                titleStyle={[styles.sortButtonText, sortBy === 'title' && styles.activeSortButtonText]}
+                isActive={sortBy === "name"}
                 onPress={() => {
-                  setSortBy('title');
+                  setSortBy("name");
                   setPage(1);
                 }}
               />
             </View>
+          </View>
+
+          <View style={styles.filterGroup}>
+            <Text style={styles.filterLabel}>Order</Text>
             <View style={styles.filterRow}>
-              <Text style={styles.label}>Order:</Text>
-              <Button
-                title="ASC"
-                type={order === 'asc' ? 'solid' : 'outline'}
-                buttonStyle={[styles.sortButton, order === 'asc' && styles.activeSortButton]}
-                titleStyle={[styles.sortButtonText, order === 'asc' && styles.activeSortButtonText]}
+              <FilterButton
+                title="Ascending"
+                isActive={order === "asc"}
                 onPress={() => {
-                  setOrder('asc');
+                  setOrder("asc");
                   setPage(1);
                 }}
               />
-              <Button
-                title="DESC"
-                type={order === 'desc' ? 'solid' : 'outline'}
-                buttonStyle={[styles.sortButton, order === 'desc' && styles.activeSortButton]}
-                titleStyle={[styles.sortButtonText, order === 'desc' && styles.activeSortButtonText]}
+              <FilterButton
+                title="Descending"
+                isActive={order === "desc"}
                 onPress={() => {
-                  setOrder('desc');
+                  setOrder("desc");
                   setPage(1);
                 }}
               />
             </View>
           </View>
         </View>
-
-        {loading && courses.length === 0 ? (
-          <ActivityIndicator size="large" color="#007bff" style={styles.loader} />
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={30} color="red" />
-            <Text style={styles.errorText}>{error}</Text>
-            <Button
-              title="Retry"
-              onPress={fetchCourses}
-              buttonStyle={styles.retryButton}
-              titleStyle={styles.retryButtonText}
-            />
-          </View>
-        ) : courses.length === 0 ? (
-          <View style={styles.nocoursesContainer}>
-            <Ionicons name="information-circle-outline" size={50} color="#888" />
-            <Text style={styles.nocoursesText}>No courses found.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={courses}
-            keyExtractor={(item) => item._id}
-            renderItem={({ item }) => <CourseItem course={item} navigation={navigation} />}
-            contentContainerStyle={styles.listContentContainer}
-            ListFooterComponent={totalPages > 1 ? renderFooter : null}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          />
-        )}
       </View>
+
+      {loading && courses.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007bff" />
+          <Text style={styles.loadingText}>Loading courses...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <View style={styles.errorIcon}>
+            <Ionicons name="alert-circle" size={48} color="#ff6b6b" />
+          </View>
+          <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchCourses}>
+            <Ionicons name="refresh" size={20} color="#fff" />
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : courses.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="library-outline" size={64} color="#555" />
+          </View>
+          <Text style={styles.emptyTitle}>No courses found</Text>
+          <Text style={styles.emptyText}>
+            {search
+              ? "Try adjusting your search terms"
+              : "Check back later for new courses"}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={courses}
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => (
+            <CourseItem course={item} navigation={navigation} />
+          )}
+          contentContainerStyle={styles.listContainer}
+          ListFooterComponent={totalPages > 1 ? renderFooter : null}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -312,133 +446,204 @@ export default function CoursesScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#f7f7f7",
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+    backgroundColor: "#f7f7f7",
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#222",
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: "#888",
+    marginTop: 4,
+    fontWeight: "500",
   },
   controlsContainer: {
-    padding: 15,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
-    marginBottom: 10,
+    borderBottomColor: "#e0e0e0",
   },
   searchBarContainer: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderBottomWidth: 0,
     borderTopWidth: 0,
-    padding: 0,
-    marginBottom: 15,
+    paddingHorizontal: 0,
+    marginBottom: 20,
   },
   searchBarInputContainer: {
-    backgroundColor: '#333',
-    borderRadius: 8,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    height: 50,
   },
   searchBarInput: {
-    color: '#eee',
+    color: "#222",
     fontSize: 16,
+    fontWeight: "500",
   },
-  sortFilterSection: {
-    flexDirection: 'column',
+  filtersContainer: {
+    gap: 16,
+  },
+  filterGroup: {
+    gap: 8,
+  },
+  filterLabel: {
+    fontSize: 14,
+    color: "#888",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 8,
+    flexDirection: "row",
+    gap: 8,
   },
-  label: {
-    fontSize: 14,
-    marginRight: 8,
-    fontWeight: '600',
-    color: '#bbb',
-  },
-  sortButton: {
+  filterButton: {
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    paddingHorizontal: 12,
     borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
-    minWidth: 80,
-    borderColor: '#555',
+    backgroundColor: "#f5f5f5",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
   },
-  activeSortButton: {
-    backgroundColor: '#fff',
+  activeFilterButton: {
+    backgroundColor: "#007bff",
+    borderColor: "#007bff",
   },
-  sortButtonText: {
-    fontWeight: 'bold',
-    color: '#fff',
+  filterButtonText: {
+    fontSize: 14,
+    color: "#888",
+    fontWeight: "600",
   },
-  activeSortButtonText: {
-    color: '#000',
+  activeFilterButtonText: {
+    color: "#fff",
   },
-  listContentContainer: {
-    paddingBottom: 20,
+  listContainer: {
+    paddingVertical: 16,
   },
-  loader: {
+  loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#888",
+    fontWeight: "500",
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+    gap: 16,
+  },
+  errorIcon: {
+    marginBottom: 8,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#222",
+    textAlign: "center",
   },
   errorText: {
-    color: '#ff6b6b',
-    marginTop: 10,
     fontSize: 16,
-    textAlign: 'center',
+    color: "#444",
+    textAlign: "center",
+    lineHeight: 24,
   },
   retryButton: {
-    backgroundColor: '#007bff',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#007bff",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "600",
   },
-  nocoursesContainer: {
+  emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+    gap: 16,
   },
-  nocoursesText: {
-    fontSize: 18,
-    color: '#aaa',
-    marginTop: 10,
+  emptyIcon: {
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#222",
+    textAlign: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 24,
   },
   paginationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#333',
-    backgroundColor: '#1a1a1a',
-    marginTop: 10,
-    borderRadius: 12,
-    marginHorizontal: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 16,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
   },
-  paginationButton: {},
+  paginationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#f5f5f5",
+  },
+  disabledPaginationButton: {
+    opacity: 0.5,
+  },
   paginationButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#222",
+  },
+  disabledPaginationButtonText: {
+    color: "#bbb",
+  },
+  pageIndicator: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 12,
   },
   pageInfo: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#bbb',
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#888",
   },
 });
