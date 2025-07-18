@@ -349,9 +349,6 @@ const styles = StyleSheet.create({
   controlsContainer: {
     padding: 15,
     backgroundColor: '#1a1a1a', 
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-    marginBottom: 10,
   },
   searchInputWrapper: {
     flexDirection: 'row',
