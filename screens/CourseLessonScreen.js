@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-} from 'react-native';
-import { Card, Button, Icon } from 'react-native-elements';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MOBILE_SERVER_URL } from '@env';
+} from "react-native";
+import { Card, Button, Icon } from "react-native-elements";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../context/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { MOBILE_SERVER_URL } from "@env";
 
-const API_BASE_URL = 'http://localhost:4000/api';
+const API_BASE_URL = "http://localhost:4000/api";
 
 const CourseLessonScreen = ({ route, navigation }) => {
   const { courseId, courseName } = route.params;
@@ -33,14 +33,17 @@ const CourseLessonScreen = ({ route, navigation }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${MOBILE_SERVER_URL}api/courses/${courseId}/lessons`, {
-        headers: { 'Authorization': `Bearer ${userToken}` },
-      });
+      const response = await fetch(
+        `${MOBILE_SERVER_URL}api/courses/${courseId}/lessons`,
+        {
+          headers: { Authorization: `Bearer ${userToken}` },
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch lessons');
+        throw new Error(data.message || "Failed to fetch lessons");
       }
 
       const lessonsData = data.data || [];
@@ -59,24 +62,37 @@ const CourseLessonScreen = ({ route, navigation }) => {
     try {
       const completionPromises = lessonsData.map(async (lesson) => {
         try {
-          const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons/${lesson._id}/lesson`, {
-            headers: { 'Authorization': `Bearer ${userToken}` },
-          });
+          const response = await fetch(
+            `${MOBILE_SERVER_URL}api/user-lessons/${lesson._id}/lesson`,
+            {
+              headers: { Authorization: `Bearer ${userToken}` },
+            }
+          );
 
           if (response.ok) {
             const data = await response.json();
             // Use userLesson.status and userLesson.currentOrder from API
             return {
               lessonId: lesson._id,
-              completed: data.userLesson?.status === 'completed',
+              completed: data.userLesson?.status === "completed",
               currentOrder: data.userLesson?.currentOrder || [],
-              status: data.userLesson?.status || 'ongoing',
+              status: data.userLesson?.status || "ongoing",
             };
           }
-          return { lessonId: lesson._id, completed: false, currentOrder: [], status: 'not_started' };
+          return {
+            lessonId: lesson._id,
+            completed: false,
+            currentOrder: [],
+            status: "not_started",
+          };
         } catch (error) {
-          console.log('Error fetching user lesson status:', error);
-          return { lessonId: lesson._id, completed: false, currentOrder: [], status: 'not_started' };
+          console.log("Error fetching user lesson status:", error);
+          return {
+            lessonId: lesson._id,
+            completed: false,
+            currentOrder: [],
+            status: "not_started",
+          };
         }
       });
 
@@ -84,67 +100,73 @@ const CourseLessonScreen = ({ route, navigation }) => {
       const progressData = {};
       const completedIds = [];
 
-      completionResults.forEach(({ lessonId, completed, currentOrder, status }) => {
-        progressData[lessonId] = { completed, currentOrder, status };
-        if (completed) {
-          completedIds.push(lessonId);
+      completionResults.forEach(
+        ({ lessonId, completed, currentOrder, status }) => {
+          progressData[lessonId] = { completed, currentOrder, status };
+          if (completed) {
+            completedIds.push(lessonId);
+          }
         }
-      });
+      );
       setLessonProgress(progressData);
       setCompletedLessons(completedIds);
     } catch (error) {
-      console.log('Error fetching completion status:', error);
+      console.log("Error fetching completion status:", error);
     }
   };
 
   const updateLessonStatus = async (lessonId, status) => {
     try {
-      const lessonResponse = await fetch(`${MOBILE_SERVER_URL}api/user-lessons/${lessonId}/lesson`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-      });
+      const lessonResponse = await fetch(
+        `${MOBILE_SERVER_URL}api/user-lessons/${lessonId}/lesson`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userToken}`,
+          },
+        }
+      );
       const lessonData = await lessonResponse.json();
 
-      const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons/${lessonData?.userLesson?._id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ status }),
-      });
+      const response = await fetch(
+        `${MOBILE_SERVER_URL}api/user-lessons/${lessonData?.userLesson?._id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userToken}`,
+          },
+          body: JSON.stringify({ status }),
+        }
+      );
 
       if (response.ok) {
         // Update local state
-        setLessonProgress(prev => ({
+        setLessonProgress((prev) => ({
           ...prev,
-          [lessonId]: { ...prev[lessonId], completed: status === 'completed' }
+          [lessonId]: { ...prev[lessonId], completed: status === "completed" },
         }));
 
-        if (status === 'completed') {
-          setCompletedLessons(prev =>
+        if (status === "completed") {
+          setCompletedLessons((prev) =>
             prev.includes(lessonId) ? prev : [...prev, lessonId]
           );
         } else {
-          setCompletedLessons(prev =>
-            prev.filter(id => id !== lessonId)
-          );
+          setCompletedLessons((prev) => prev.filter((id) => id !== lessonId));
         }
 
         return true;
       }
       return false;
     } catch (error) {
-      console.log('Error updating lesson status:', error);
+      console.log("Error updating lesson status:", error);
       return false;
     }
   };
 
   const navigateToLesson = (lesson) => {
     console.log("Lesson:", lesson);
-    navigation.navigate('CourseDetail', {
+    navigation.navigate("CourseDetail", {
       courseId,
       lessonId: lesson._id,
       lessonName: lesson.name,
@@ -155,7 +177,9 @@ const CourseLessonScreen = ({ route, navigation }) => {
   const renderLessonCard = (lesson, index) => {
     const lessonProgressData = lessonProgress[lesson._id];
     const isCompleted = lessonProgressData?.completed || false;
-    const isLocked = index > 0 && !(lessonProgress[lessons[index - 1]?._id]?.completed || false);
+    const isLocked =
+      index > 0 &&
+      !(lessonProgress[lessons[index - 1]?._id]?.completed || false);
 
     return (
       <TouchableOpacity
@@ -182,9 +206,19 @@ const CourseLessonScreen = ({ route, navigation }) => {
             {isLocked ? (
               <Icon name="lock" type="feather" color="#888" size={20} />
             ) : isCompleted ? (
-              <Icon name="check-circle" type="feather" color="#28a745" size={24} />
+              <Icon
+                name="check-circle"
+                type="feather"
+                color="#28a745"
+                size={24}
+              />
             ) : (
-              <Icon name="play-circle" type="feather" color="#007AFF" size={24} />
+              <Icon
+                name="play-circle"
+                type="feather"
+                color="#007AFF"
+                size={24}
+              />
             )}
           </View>
         </View>
@@ -195,12 +229,12 @@ const CourseLessonScreen = ({ route, navigation }) => {
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${isCompleted ? 100 : 0}%` }
+                  { width: `${isCompleted ? 100 : 0}%` },
                 ]}
               />
             </View>
             <Text style={styles.progressText}>
-              {isCompleted ? 'Completed' : 'Not started'}
+              {isCompleted ? "Completed" : "Not started"}
             </Text>
           </View>
         )}
@@ -268,7 +302,10 @@ const CourseLessonScreen = ({ route, navigation }) => {
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>
-              {lessons.length > 0 ? Math.round((completedLessons.length / lessons.length) * 100) : 0}%
+              {lessons.length > 0
+                ? Math.round((completedLessons.length / lessons.length) * 100)
+                : 0}
+              %
             </Text>
             <Text style={styles.statLabel}>Progress</Text>
           </View>
@@ -290,27 +327,27 @@ const CourseLessonScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: "#1a1a1a",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: "#2a2a2a",
   },
   backButton: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: '#333',
+    backgroundColor: "#333",
   },
   headerTitle: {
     flex: 1,
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#fff",
+    textAlign: "center",
     marginHorizontal: 10,
   },
   headerSpacer: {
@@ -318,38 +355,38 @@ const styles = StyleSheet.create({
   },
   progressOverview: {
     padding: 20,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: "#2a2a2a",
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: "#333",
   },
   progressTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
     marginBottom: 15,
   },
   progressStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
   },
   statItem: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   statNumber: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    fontWeight: "bold",
+    color: "#007AFF",
   },
   statLabel: {
     fontSize: 12,
-    color: '#ccc',
+    color: "#ccc",
     marginTop: 4,
   },
   statDivider: {
     width: 1,
     height: 30,
-    backgroundColor: '#333',
+    backgroundColor: "#333",
   },
   lessonsContainer: {
     flex: 1,
@@ -359,128 +396,128 @@ const styles = StyleSheet.create({
   },
   lessonsTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
     marginBottom: 20,
   },
   lessonCard: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: "#2a2a2a",
     borderRadius: 12,
     padding: 20,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: "#333",
   },
   completedLessonCard: {
-    borderColor: '#28a745',
-    backgroundColor: '#1a2a1a',
+    borderColor: "#28a745",
+    backgroundColor: "#1a2a1a",
   },
   lockedLessonCard: {
     opacity: 0.6,
-    backgroundColor: '#222',
+    backgroundColor: "#222",
   },
   lessonHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 15,
   },
   lessonNumberContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 15,
   },
   lessonNumber: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
   },
   lessonInfo: {
     flex: 1,
   },
   lessonTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: "bold",
+    color: "#fff",
     marginBottom: 4,
   },
   lessonDescription: {
     fontSize: 14,
-    color: '#ccc',
+    color: "#ccc",
     lineHeight: 20,
   },
   lessonStatus: {
     marginLeft: 10,
   },
   lessonProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   progressBar: {
     flex: 1,
     height: 6,
-    backgroundColor: '#444',
+    backgroundColor: "#444",
     borderRadius: 3,
     marginRight: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressFill: {
-    height: '100%',
-    backgroundColor: '#28a745',
+    height: "100%",
+    backgroundColor: "#28a745",
     borderRadius: 3,
   },
   progressText: {
     fontSize: 12,
-    color: '#ccc',
+    color: "#ccc",
     minWidth: 80,
   },
   lockedMessage: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 10,
   },
   lockedText: {
     fontSize: 12,
-    color: '#888',
-    fontStyle: 'italic',
+    color: "#888",
+    fontStyle: "italic",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1a1a1a",
   },
   loadingText: {
-    color: '#fff',
+    color: "#fff",
     marginTop: 10,
     fontSize: 16,
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1a1a1a",
     padding: 20,
   },
   errorText: {
-    color: '#ff6b6b',
+    color: "#ff6b6b",
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     marginVertical: 20,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });
 
-export default CourseLessonScreen; 
+export default CourseLessonScreen;
