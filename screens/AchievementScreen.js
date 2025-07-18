@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { MOBILE_SERVER_URL } from '@env';
+import LottieView from 'lottie-react-native';
 
 export default function AchievementScreen() {
   const { userToken, userId } = useAuth();
@@ -117,17 +118,17 @@ export default function AchievementScreen() {
   }
 
   return (
-    <View style={[achievementStyles.container, { backgroundColor: theme.colors.background }]}>
+    <ScrollView style={[achievementStyles.container, { backgroundColor: theme.colors.background }]}>
       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
         <Text style={[achievementStyles.title, {color: theme.colors.text}]}>Your Achievements</Text>
         <Ionicons name="happy" size={30} color="#FFD700" style={{ marginLeft: 10 }} />
       </View>
 
-      {/* <LottieView
-        source={{ uri: 'https://lottie.host/67eae408-eed7-4ae8-b53f-2cc54bf08e00/47pdFgUoVq.json' }}
+      <LottieView
+        source={{ uri: 'https://lottie.host/b2956be4-af80-442b-9f06-2e58c668fb35/OL6wYDxcAA.json' }}
+        speed={0.5}
         autoPlay
-        loop
-        style={{ width: 600, height: 200, alignSelf: 'center' }} /> */}
+        style={{ width: 600, height: 200, alignSelf: 'center' }} />
 
       <FlatList
         data={achievements}
@@ -154,7 +155,7 @@ export default function AchievementScreen() {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 

@@ -7,13 +7,14 @@ import { useAuth } from '.././context/AuthContext';
 import Swiper from 'react-native-swiper';
 import { Divider } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../context/ThemeContext'; 
+import { useTheme } from '../context/ThemeContext';
+import LottieView from 'lottie-react-native';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const navigation = useNavigation();
-  const { theme } = useTheme(); 
+  const { theme } = useTheme();
 
   const imageUrls = [
     'https://images.pexels.com/photos/5652121/pexels-photo-5652121.jpeg',
@@ -35,7 +36,7 @@ export default function HomeScreen() {
           showsPagination={true}
           loop
           dotStyle={styles.paginationDot}
-          activeDotStyle={[styles.activePaginationDot, { backgroundColor: theme.colors.text }]} 
+          activeDotStyle={[styles.activePaginationDot, { backgroundColor: theme.colors.text }]}
         >
           {imageUrls.map((url, index) => (
             <Image
@@ -67,6 +68,12 @@ export default function HomeScreen() {
           </Text>
         </View>
       </View>
+
+      <LottieView
+        source={{ uri: 'https://lottie.host/dc75f86c-1920-48bf-9d38-e84684bd4612/NqkDK4PTpW.json' }}
+        speed={0.5}
+        autoPlay
+        style={{ width: 600, height: 200, alignSelf: 'center' }} />
 
       <TouchableOpacity style={[styles.callToActionCard, { backgroundColor: theme.colors.primary }]} onPress={() => navigation.navigate('Courses')}>
         <Text style={styles.callToActionText}>Explore Our Courses!</Text>
@@ -144,7 +151,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
-    borderWidth: 1, 
+    borderWidth: 1,
   },
   featureIcon: {
     marginRight: 10,
@@ -161,9 +168,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
     marginBottom: 20,
-    shadowColor: 'blue', 
+    shadowColor: 'blue',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -183,7 +189,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#eee', 
+    backgroundColor: '#eee',
     marginHorizontal: 20,
   },
   themeToggleButtonText: {
