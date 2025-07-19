@@ -1,7 +1,6 @@
 import React, { createContext, useState, useEffect, useMemo, useContext, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
-import { MOBILE_SERVER_URL } from '@env';
+import SecureStorage, { SECURE_KEYS } from '../utils/secureStorage';
+import authService from '../services/authService';
 
 export const AuthContext = createContext();
 
@@ -12,35 +11,22 @@ export const AuthProvider = ({ children }) => {
 
   const fetchAndSetUserProfile = useCallback(async (token) => {
     try {
-      console.log('AuthContext: Attempting to fetch user profile for ID and full user data...');
-      const response = await fetch(`${MOBILE_SERVER_URL}api/auth/me`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      console.log('AuthContext: Fetching user profile...');
+      const result = await authService.getUserProfile(token);
 
-      const data = await response.json();
-
-      if (response.ok && data.user && data.user._id) {
-        console.log('AuthContext: User profile fetched successfully. User ID:', data.user._id);
-        await AsyncStorage.setItem('userId', data.user._id);
-        setUserId(data.user._id);
-        return data.user._id; 
+      if (result.success && result.userId) {
+        console.log('AuthContext: User profile fetched. User ID:', result.userId);
+        await SecureStorage.setUserData(SECURE_KEYS.USER_ID, result.userId);
+        setUserId(result.userId);
+        return result.userId; 
       } else {
-        console.error('AuthContext: Failed to fetch user profile or _id was missing:', data.message);
-        throw new Error(data.message || 'Failed to get user profile after login.');
+        console.error('AuthContext: Failed to fetch user profile:', result.error);
+        throw new Error(result.error || 'Failed to get user profile.');
       }
     } catch (error) {
       console.error('AuthContext: Error in fetchAndSetUserProfile:', error);
-      Alert.alert('Authentication Error', 'Could not retrieve user details. Please log in again.');
-      // Important: If profile fetch fails, clear token and userId to force re-login
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userId');
-      setUserToken(null);
-      setUserId(null);
-      throw error; // Re-throw to propagate the error
+      // Don't clear token here - let the calling method handle token management
+      throw error;
     }
   }, []);
 
@@ -49,26 +35,33 @@ export const AuthProvider = ({ children }) => {
       console.log('AuthContext: Checking authentication status...');
       setIsLoading(true);
       try {
-        const token = await AsyncStorage.getItem('userToken');
-        const storedUserId = await AsyncStorage.getItem('userId');
-        console.log('AuthContext: Token retrieved:', token ? 'Found' : 'Not Found');
-        console.log('AuthContext: Stored User ID:', storedUserId ? storedUserId : 'Not Found');
+        const token = await SecureStorage.getToken();
+        const storedUserId = await SecureStorage.getUserData(SECURE_KEYS.USER_ID);
+        
+        console.log('AuthContext: Token found:', !!token);
+        console.log('AuthContext: User ID found:', !!storedUserId);
+        
         setUserToken(token);
         if (token && !storedUserId) {
-          console.log('AuthContext: Token found but no UserId. Fetching profile to get UserId...');
-          await fetchAndSetUserProfile(token); 
+          console.log('AuthContext: Token found but no UserId. Fetching profile...');
+          try {
+            await fetchAndSetUserProfile(token);
+          } catch (profileError) {
+            console.warn('AuthContext: Failed to fetch profile during auth check, but keeping token:', profileError);
+            // Keep the token, profile can be fetched later
+          }
         } else {
           setUserId(storedUserId);
         }
       } catch (error) {
-        console.error('AuthContext: Failed to retrieve user token from AsyncStorage:', error);
-        await AsyncStorage.removeItem('userToken');
-        await AsyncStorage.removeItem('userId');
+        console.error('AuthContext: Failed to retrieve user token:', error);
+        await SecureStorage.removeToken();
+        await SecureStorage.removeUserData(SECURE_KEYS.USER_ID);
         setUserToken(null);
         setUserId(null);
       } finally {
         setIsLoading(false);
-        console.log('AuthContext: Authentication check complete. IsLoading set to false.');
+        console.log('AuthContext: Authentication check complete.');
       }
     };
 
@@ -76,8 +69,8 @@ export const AuthProvider = ({ children }) => {
   }, [fetchAndSetUserProfile]);
 
   useEffect(() => {
-    console.log('AuthContext: userToken state changed to:', userToken ? 'LOGGED_IN' : 'LOGGED_OUT');
-    console.log('AuthContext: userId state changed to:', userId || 'NULL');
+    console.log('AuthContext: userToken state:', userToken ? 'LOGGED_IN' : 'LOGGED_OUT');
+    console.log('AuthContext: userId state:', userId || 'NULL');
   }, [userToken, userId]);
 
   const authContext = useMemo(
@@ -90,39 +83,61 @@ export const AuthProvider = ({ children }) => {
       signIn: async (token) => {
         console.log('AuthContext: Signing in...');
         try {
-          await AsyncStorage.setItem('userToken', token);
+          await SecureStorage.setToken(token);
           setUserToken(token);
-          await fetchAndSetUserProfile(token); 
-          console.log('AuthContext: User signed in successfully.');
-          console.log(token);
+          
+          // Try to fetch user profile, but don't fail the login if this fails
+          try {
+            await fetchAndSetUserProfile(token); 
+            console.log('AuthContext: User signed in successfully with profile.');
+          } catch (profileError) {
+            console.warn('AuthContext: Failed to fetch user profile, but login was successful:', profileError);
+            // Keep the token and allow navigation to proceed
+            // The profile can be fetched later
+          }
         } catch (error) {
-          console.error('AuthContext: Error setting token during signIn:', error);
-          Alert.alert('Login Error', 'Failed to save login session. Please try again.');
+          console.error('AuthContext: Error during signIn:', error);
+          // Only clear token if the initial token setting failed
+          await SecureStorage.removeToken();
+          setUserToken(null);
+          throw error;
         }
       },
+
       signOut: async () => {
-        console.log('AuthContext: Initiating signOut...');
+        console.log('AuthContext: Signing out...');
         try {
-          await AsyncStorage.removeItem('userToken');
-          await AsyncStorage.removeItem('userId');
+          // Call logout API if we have a token
+          if (userToken) {
+            try {
+              await authService.logout();
+            } catch (apiError) {
+              console.warn('AuthContext: Logout API call failed, continuing with local cleanup:', apiError);
+            }
+          }
+          
+          // Clear storage
+          await SecureStorage.removeToken();
+          await SecureStorage.removeUserData(SECURE_KEYS.USER_ID);
           setUserToken(null);
           setUserId(null);
-          console.log('AuthContext: SignOut complete. userToken set to null.');
+          console.log('AuthContext: SignOut complete.');
         } catch (error) {
-          console.error('AuthContext: Error removing token during signOut:', error);
-          Alert.alert('Logout Error', 'Failed to clear login session. Please try again.');
+          console.error('AuthContext: Error during signOut:', error);
+          throw error;
         }
       },
+
       signUp: async (token) => {
         console.log('AuthContext: Signing up...');
         try {
-          await AsyncStorage.setItem('userToken', token);
+          await SecureStorage.setToken(token);
           setUserToken(token);
           await fetchAndSetUserProfile(token);
           console.log('AuthContext: User signed up and logged in successfully.');
         } catch (error) {
-          console.error('AuthContext: Error setting token during signUp:', error);
-          Alert.alert('Signup Error', 'Failed to save signup session. Please try again.');
+          console.error('AuthContext: Error during signUp:', error);
+          throw error;
         }
       },
     }),

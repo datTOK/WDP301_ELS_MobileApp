@@ -1,165 +1,124 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, FlatList, TouchableOpacity, ScrollView } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
+import { Card } from 'react-native-elements';
 import { useTheme } from '../context/ThemeContext';
-import { MOBILE_SERVER_URL } from '@env';
-import LottieView from 'lottie-react-native';
+import { useToast } from '../context/ToastContext';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { userAchievementService, apiUtils } from '../services';
 
 export default function AchievementScreen() {
-  const { userToken, userId } = useAuth();
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
-  const [size, setSize] = useState(5);
-  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const { theme } = useTheme(); 
+
+  const { theme } = useTheme();
+  const { showError } = useToast();
 
   useEffect(() => {
-    if (userId && userToken) {
-      fetchUserAchievements();
-    } else {
-      setLoading(false);
-      setError("User not logged in or user ID is missing.");
-    }
-  }, [userId, userToken, page, size]);
+    fetchAchievements();
+  }, [currentPage]);
 
-  const fetchUserAchievements = async () => {
-    setLoading(true);
-    setError(null);
+  const fetchAchievements = async () => {
     try {
-      if (!userId || !userToken) {
-        throw new Error('Authentication token or user ID is missing.');
-      }
-
-      console.log(`Fetching achievements for user ID: ${userId}, Page: ${page}, Size: ${size}`);
-      const response = await fetch(`${MOBILE_SERVER_URL}api/user-achievements/${userId}/users?page=${page}&size=${size}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
+      setLoading(true);
+      setError(null);
+      const response = await userAchievementService.getUserAchievements({
+        page: currentPage,
+        limit: 10
       });
-
-      const data = await response.json();
-      console.log('Achievement API response:', data);
-
-      if (response.ok) {
-        setAchievements(data.data);
-        setTotal(data.total);
-        setTotalPages(data.totalPages);
+      
+      const result = apiUtils.parseResponse(response);
+      
+      if (result.data && Array.isArray(result.data.achievements)) {
+        setAchievements(result.data.achievements);
+        setTotalPages(result.data.totalPages || 0);
       } else {
-        const errorMessage = data.message || 'Failed to fetch user achievements.';
-        throw new Error(errorMessage);
+        setError('Invalid data structure received');
       }
     } catch (err) {
       console.error('Error fetching user achievements:', err);
-      setError(err.message || 'An unexpected error occurred while loading achievements.');
-      Alert.alert('Error', err.message || 'Could not load achievements.');
+      const errorInfo = apiUtils.handleError(err);
+      setError(errorInfo.message);
+      showError('Error', errorInfo.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderAchievementItem = ({ item }) => (
-    <View style={[achievementStyles.achievementCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
-      <Ionicons name="trophy" size={30} color="#FFD700" style={achievementStyles.medalIcon} />
-      <View style={achievementStyles.achievementTextContainer}>
-        <Text style={[achievementStyles.achievementName, {color: theme.colors.primary}]}>{item.achievement.name}</Text>
-        <Text style={[achievementStyles.achievementDescription , { color: theme.colors.text }]}>{item.achievement.description}</Text>
-        <Text style={achievementStyles.achievementDate}>Achieved on: {formatDate(item.createdAt)}</Text>
+  const renderAchievement = ({ item }) => (
+    <Card containerStyle={[styles.card, { backgroundColor: theme.colors.cardBackground }]}>
+      <View style={styles.achievementHeader}>
+        <Image
+          source={{ uri: item.achievement.icon || 'https://via.placeholder.com/50' }}
+          style={styles.achievementIcon}
+        />
+        <View style={styles.achievementInfo}>
+          <Text style={[styles.achievementTitle, { color: theme.colors.text }]}>
+            {item.achievement.title}
+          </Text>
+          <Text style={[styles.achievementDescription, { color: theme.colors.textSecondary }]}>
+            {item.achievement.description}
+          </Text>
+        </View>
       </View>
-    </View>
+      <View style={styles.achievementFooter}>
+        <Text style={[styles.achievementDate, { color: theme.colors.textMuted }]}>
+          Earned: {new Date(item.earnedAt).toLocaleDateString()}
+        </Text>
+      </View>
+    </Card>
   );
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-    } catch (e) {
-      console.warn("Invalid date string for formatting:", dateString);
-      return dateString;
-    }
-  };
-
   if (loading) {
-    return (
-      <View style={achievementStyles.centered}>
-        <ActivityIndicator size="large" color="#4CC2FF" />
-        <Text style={achievementStyles.loadingText}>Loading achievements...</Text>
-      </View>
-    );
+    return <LoadingSpinner fullScreen text="Loading achievements..." />;
   }
 
   if (error) {
     return (
-      <View style={achievementStyles.centered}>
-        <Text style={achievementStyles.errorText}>Error: {error}</Text>
-        <TouchableOpacity style={achievementStyles.retryButton} onPress={fetchUserAchievements}>
-          <Text style={achievementStyles.retryButtonText}>Tap to Retry</Text>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <Text style={[styles.errorText, { color: theme.colors.error }]}>
+          Error: {error}
+        </Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchAchievements}>
+          <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  if (!achievements.length) {
-    return (
-      <View style={achievementStyles.centered}>
-        <Text style={achievementStyles.noAchievementsText}>No achievements found yet. Keep learning!</Text>
-      </View>
-    );
-  }
-
   return (
-    <ScrollView style={[achievementStyles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={[achievementStyles.title, {color: theme.colors.text}]}>Your Achievements</Text>
-        <Ionicons name="happy" size={30} color="#FFD700" style={{ marginLeft: 10 }} />
-      </View>
-
-      <LottieView
-        source={{ uri: 'https://lottie.host/b2956be4-af80-442b-9f06-2e58c668fb35/OL6wYDxcAA.json' }}
-        speed={0.5}
-        autoPlay
-        style={{ width: 600, height: 200, alignSelf: 'center' }} />
-
-      <FlatList
-        data={achievements}
-        renderItem={renderAchievementItem}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={achievementStyles.listContent}
-      />
-      {totalPages > 1 && (
-        <View style={achievementStyles.paginationContainer}>
-          <TouchableOpacity
-            style={achievementStyles.paginationButton}
-            onPress={() => setPage(prev => Math.max(1, prev - 1))}
-            disabled={page === 1}
-          >
-            <Text style={achievementStyles.paginationButtonText}>Previous</Text>
-          </TouchableOpacity>
-          <Text style={achievementStyles.paginationText}>Page {page} of {totalPages}</Text>
-          <TouchableOpacity
-            style={achievementStyles.paginationButton}
-            onPress={() => setPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={page === totalPages}
-          >
-            <Text style={achievementStyles.paginationButtonText}>Next</Text>
-          </TouchableOpacity>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Text style={[styles.title, { color: theme.colors.text }]}>My Achievements</Text>
+      
+      {achievements.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+            No achievements earned yet. Keep learning to unlock achievements!
+          </Text>
         </View>
+      ) : (
+        <FlatList
+          data={achievements}
+          renderItem={renderAchievement}
+          keyExtractor={(item) => item._id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+        />
       )}
-    </ScrollView>
+    </View>
   );
 }
 
-const achievementStyles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -266,5 +225,57 @@ const achievementStyles = StyleSheet.create({
   paginationText: {
     color: '#fff',
     fontSize: 16,
+  },
+  // Additional styles needed by the component
+  card: {
+    borderRadius: 12,
+    marginVertical: 10,
+    marginHorizontal: 15,
+    padding: 0,
+    overflow: 'hidden',
+    backgroundColor: '#2a2a2a',
+    borderColor: '#333',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  achievementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+  },
+  achievementIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 15,
+  },
+  achievementInfo: {
+    flex: 1,
+  },
+  achievementTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  achievementFooter: {
+    paddingHorizontal: 15,
+    paddingBottom: 15,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  listContainer: {
+    paddingBottom: 20,
   },
 });

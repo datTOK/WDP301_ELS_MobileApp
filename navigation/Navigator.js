@@ -27,6 +27,7 @@ function BlogStackScreen() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
+        cardStyle: { backgroundColor: '#202020' },
       }}
     >
       <Stack.Screen name="Blog" component={BlogScreen} />
@@ -34,8 +35,7 @@ function BlogStackScreen() {
         name="BlogDetail"
         component={BlogDetailScreen}
         options={{
-          headerShown: true,
-          headerTitle: 'Back',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>
@@ -46,7 +46,8 @@ export function ProfileStackScreen() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerShown: true,
+        headerShown: false,
+        cardStyle: { backgroundColor: '#202020' },
       }}
     >
       <Stack.Screen name="Profile" component={ProfileScreen} />
@@ -60,6 +61,7 @@ function CoursesStackScreen() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
+        cardStyle: { backgroundColor: '#202020' },
       }}
     >
       <Stack.Screen name="CoursesList" component={CoursesScreen} />
@@ -67,8 +69,7 @@ function CoursesStackScreen() {
         name="CourseOverview"
         component={CourseOverviewScreen}
         options={{
-          headerShown: true,
-          headerTitle: 'Course Overview',
+          headerShown: false,
         }}
       />
       <Stack.Screen
@@ -76,7 +77,6 @@ function CoursesStackScreen() {
         component={CourseLessonScreen}
         options={{
           headerShown: false,
-          headerTitle: 'Lesson',
         }}
       />
       <Stack.Screen
@@ -84,7 +84,6 @@ function CoursesStackScreen() {
         component={CourseDetailScreen}
         options={{
           headerShown: false,
-          headerTitle: 'Course Details',
         }}
       />
       <Stack.Screen
@@ -92,15 +91,13 @@ function CoursesStackScreen() {
         component={TestScreen}
         options={{
           headerShown: false,
-          headerTitle: 'Course Tests',
         }}
       />
       <Stack.Screen
         name="TestScreenDetail"
         component={TestScreenDetail}
         options={{
-          headerShown: true,
-          headerTitle: 'Take Test',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>
@@ -112,6 +109,7 @@ function MyCoursesStackScreen() {
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
+        cardStyle: { backgroundColor: '#202020' },
       }}
     >
       {/* <Stack.Screen name="MyCoursesList" component={MyCoursesScreen} /> */}
@@ -121,6 +119,8 @@ function MyCoursesStackScreen() {
         options={{
           headerShown: true,
           headerTitle: 'Course Details',
+          headerStyle: { backgroundColor: '#2B2B2B' },
+          headerTintColor: '#ededed',
         }}
       />
     </Stack.Navigator>
@@ -153,16 +153,18 @@ export function TabNavigator() {
           // }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: 'black',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#4CC2FF',
+        tabBarInactiveTintColor: '#AAAAAA',
         tabBarStyle: {
-          backgroundColor: '#f0f0f0',
-          borderTopWidth: 0,
+          backgroundColor: '#2B2B2B',
+          borderTopWidth: 1,
+          borderTopColor: '#1D1D1D',
           paddingBottom: 5,
           height: 60,
         },
         tabBarLabelStyle: {
           fontSize: 12,
+          fontFamily: 'Mulish-Medium',
         },
       })
       }
@@ -172,15 +174,23 @@ export function TabNavigator() {
       <Tab.Screen name="Courses" component={CoursesStackScreen} options={{ tabBarLabel: 'Courses' }} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
       <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog' }} />
+      <Tab.Screen name="Profile" component={ProfileStackScreen} />
     </ Tab.Navigator>
   );
 }
 
 export function AuthStackScreen() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      initialRouteName="Login"
+      screenOptions={{ 
+        headerShown: false,
+        cardStyle: { backgroundColor: '#202020' },
+      }}
+    >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
+      <Stack.Screen name="GuestHome" component={HomeScreen} />
     </Stack.Navigator>
   );
 }
@@ -189,4 +199,9 @@ export function AppNavigator() {
   const { userToken } = useAuth();
 
   return userToken == null ? <AuthStackScreen /> : <TabNavigator />;
+}
+
+// Default export for App.js
+export default function Navigator() {
+  return <AppNavigator />;
 }

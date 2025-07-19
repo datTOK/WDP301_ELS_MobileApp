@@ -1,11 +1,14 @@
-import React, { useState, useContext, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Animated, Easing } from 'react-native';
+import React, { useState, useContext } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { AuthContext } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { Ionicons } from '@expo/vector-icons';
-import { MOBILE_SERVER_URL } from '@env';
+import { authService, apiUtils } from '../../services';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const ChangePasswordScreen = ({ navigation }) => {
   const { userToken, signOut } = useContext(AuthContext);
+  const { showError, showSuccess, showWarning } = useToast();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -15,84 +18,46 @@ const ChangePasswordScreen = ({ navigation }) => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
-  const [message, setMessage] = useState(null);
-  const [messageType, setMessageType] = useState(null);
-  const messageOpacity = useRef(new Animated.Value(0)).current;
 
-  // Function to show custom messages
-  const showCustomMessage = (msg, type) => {
-    setMessage(msg);
-    setMessageType(type);
-    Animated.sequence([
-      Animated.timing(messageOpacity, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.ease,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.delay(3000),
-      Animated.timing(messageOpacity, {
-        toValue: 0,
-        duration: 500,
-        easing: Easing.ease,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    ]).start(() => {
-      setMessage(null);
-      setMessageType(null);
-    });
-  };
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmNewPassword) {
-      showCustomMessage('Please fill in all fields.', 'error');
+      showError('Please fill in all fields.');
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      showCustomMessage('New password and confirm new password do not match.', 'error');
+      showError('New password and confirm new password do not match.');
       return;
     }
 
     if (newPassword.length < 6) {
-      showCustomMessage('New password must be at least 6 characters long.', 'error');
+      showError('New password must be at least 6 characters long.');
       return;
     }
 
     setLoading(true);
 
-    console.log('Attempting to change password with:');
-    console.log('Old Password:', currentPassword);
-    console.log('New Password:', newPassword);
-
     try {
-      const response = await fetch('http://localhost:4000/api/auth/change-password', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({
-          oldPassword: currentPassword,
-          newPassword: newPassword,
-        }),
+      const response = await authService.changePassword({
+        oldPassword: currentPassword,
+        newPassword: newPassword,
       });
 
-      const data = await response.json();
+      const result = apiUtils.parseResponse(response);
 
-      if (response.ok) {
-        showCustomMessage('Password changed successfully! Please log in again with your new password.', 'success');
+      if (result.data) {
+        showSuccess('Password changed successfully! Please log in again with your new password.');
         setTimeout(() => {
           signOut();
           navigation.navigate('Login');
-        }, 3500); // 3 seconds display + 0.5 seconds fade out + buffer
+        }, 2000);
       } else {
-        showCustomMessage(data.message || 'Failed to change password. Please try again.', 'error');
+        showError(result.message || 'Failed to change password. Please try again.');
       }
     } catch (error) {
-      console.error('Change password error:', error);
-      showCustomMessage('An unexpected error occurred. Please try again later.', 'error');
+      const errorInfo = apiUtils.handleError(error);
+      showError(errorInfo.message);
     } finally {
       setLoading(false);
     }
@@ -100,15 +65,6 @@ const ChangePasswordScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {message && (
-        <Animated.View style={[
-          styles.messageBox,
-          messageType === 'success' ? styles.successBox : styles.errorBox,
-          { opacity: messageOpacity }
-        ]}>
-          <Text style={styles.messageText}>{message}</Text>
-        </Animated.View>
-      )}
 
       <View style={styles.header}>
         <Ionicons name="lock-closed-outline" size={24} color="white" />
@@ -188,7 +144,7 @@ const ChangePasswordScreen = ({ navigation }) => {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <LoadingSpinner size="small" color="#fff" />
         ) : (
           <Text style={styles.buttonText}>Change Password</Text>
         )}

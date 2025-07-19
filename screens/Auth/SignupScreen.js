@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
+  TouchableOpacity,
   StyleSheet,
-  Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
-  TouchableOpacity,
+  ScrollView,
+  Animated,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Button } from 'react-native-elements';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { useToast } from '../../context/ToastContext';
+import { createGlobalStyles } from '../../utils/globalStyles';
+import LoadingSpinner from '../../components/LoadingSpinner';
+import { authService, apiUtils } from '../../services';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SignupScreen({ navigation }) {
@@ -20,207 +24,313 @@ export default function SignupScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { signUp } = useAuth();
+  const { theme } = useTheme();
+  const { showError, showSuccess, showWarning } = useToast();
+  const styles = createGlobalStyles(theme);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+
+  // Start animations when component mounts
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleSignup = async () => {
-    // Basic validation
     if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Signup Failed', 'Please fill in all fields.');
+      showError('Please fill in all fields');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Signup Failed', 'Passwords do not match.');
+      showError('Passwords do not match');
+      return;
+    }
+    if (password.length < 6) {
+      showError('Password must be at least 6 characters long');
       return;
     }
 
-    console.log('Attempting signup with:', { name, email, password });
+    setIsLoading(true);
     try {
-      const response = await fetch(`${MOBILE_SERVER_URL}api/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await response.json();
-      console.log('Signup API Response:', data);
-
-      if (response.ok) {
-        Alert.alert('Success', data.message || 'Account created successfully!');
-        navigation.replace('Login');
+      const response = await authService.register({ name, email, password });
+      const result = apiUtils.parseResponse(response);
+      
+      if (result.data) {
+        showSuccess('Account created successfully! Please log in.');
+        // Navigate to login screen after successful registration
+        navigation.navigate('Login');
       } else {
-        Alert.alert('Signup Failed', data.message || 'An unknown error occurred during signup.');
+        showError('Invalid response from server');
       }
     } catch (error) {
-      console.error('Signup error:', error);
-      Alert.alert('Error', 'Could not connect to the server. Please try again later.');
+      const errorInfo = apiUtils.handleError(error);
+      showError(errorInfo.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
+  };
+
+  const toggleConfirmPasswordVisibility = () => {
+    setConfirmPasswordVisible(!confirmPasswordVisible);
+  };
+
+  if (isLoading) {
+    return <LoadingSpinner fullScreen text="Creating account..." />;
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
+    <KeyboardAvoidingView 
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-
-      <View style={styles.topHeader}>
-        <Text style={styles.headerTitle}>Register Account</Text>
-      </View>
-
-      <View style={styles.whiteBridge} />
-
-      <View style={styles.container}>
-        <Image
-          source={require('../../assets/ELS_logo.png')}
-          style={styles.logo}
-          resizeMode='contain'
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name"
-          placeholderTextColor="#A0A0A0"
-          autoCapitalize="words"
-          value={name}
-          onChangeText={setName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#A0A0A0"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-        <View style={styles.passwordContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#A0A0A0"
-            secureTextEntry={!passwordVisible}
-            value={password}
-            onChangeText={setPassword}
-          />
-          <Ionicons
-            name={passwordVisible ? 'eye-off' : 'eye'}
-            size={24}
-            color="#000"
-            onPress={togglePasswordVisibility}
-            style={{ position: 'absolute', right: 10, top: 15 }} />
-        </View>
-        <TextInput
-          style={styles.input}
-          placeholder="Confirm Password"
-          placeholderTextColor="#A0A0A0"
-          secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-        />
-        <Button
-          title="Sign Up"
-          buttonStyle={styles.signupButton}
-          titleStyle={styles.signupButtonTitle}
-          onPress={handleSignup}
+      {/* Back to Home Button */}
+      <View style={localStyles.headerNav}>
+        <TouchableOpacity
+          style={localStyles.backButton}
+          onPress={() => navigation.navigate('Login')}
           activeOpacity={0.7}
-        />
-        <View style={styles.loginTextContainer}>
-          <Text style={styles.loginText}>Already have an Account ?{' '}</Text>
-          <TouchableOpacity onPress={() => navigation.replace('Login')}>
-            <Text style={styles.loginLink}>Login</Text>
-          </TouchableOpacity>
-        </View>
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          <Text style={localStyles.backButtonText}>Login</Text>
+        </TouchableOpacity>
       </View>
+
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContainer, localStyles.centeredContainer]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Logo and Header */}
+        <Animated.View 
+          style={[
+            localStyles.headerSection,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateY: slideAnim },
+                { scale: logoScale }
+              ],
+            }
+          ]}
+        >
+          <Text style={localStyles.elsLogo}>ELS</Text>
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.bodyText}>
+            Join ELS to start your English learning journey
+          </Text>
+        </Animated.View>
+
+        {/* Signup Form */}
+        <Animated.View 
+          style={[
+            styles.card,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            }
+          ]}
+        >
+          <Text style={localStyles.centeredHeading}>Sign Up</Text>
+          
+          <View style={localStyles.inputContainer}>
+            <Text style={localStyles.label}>Full Name</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your full name"
+              placeholderTextColor={theme.colors.textMuted}
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+            />
+          </View>
+
+          <View style={localStyles.inputContainer}>
+            <Text style={localStyles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your email"
+              placeholderTextColor={theme.colors.textMuted}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
+          <View style={localStyles.inputContainer}>
+            <Text style={localStyles.label}>Password</Text>
+            <View style={localStyles.passwordContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor={theme.colors.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!passwordVisible}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={localStyles.eyeIcon}
+                onPress={togglePasswordVisibility}
+              >
+                <Ionicons
+                  name={passwordVisible ? 'eye-off' : 'eye'}
+                  size={20}
+                  color={theme.colors.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={localStyles.inputContainer}>
+            <Text style={localStyles.label}>Confirm Password</Text>
+            <View style={localStyles.passwordContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Confirm your password"
+                placeholderTextColor={theme.colors.textMuted}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!confirmPasswordVisible}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                style={localStyles.eyeIcon}
+                onPress={toggleConfirmPasswordVisibility}
+              >
+                <Ionicons
+                  name={confirmPasswordVisible ? 'eye-off' : 'eye'}
+                  size={20}
+                  color={theme.colors.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleSignup}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.buttonText}>Create Account</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Login Section */}
+        <View style={styles.card}>
+          <Text style={styles.bodyText}>
+            Already have an account?{' '}
+            <Text 
+              style={localStyles.linkText}
+              onPress={() => navigation.navigate('Login')}
+            >
+              Sign in here
+            </Text>
+          </Text>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  topHeader: {
-    backgroundColor: '#fff',
-    height: 100,
+const localStyles = StyleSheet.create({
+  centeredContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
+    paddingVertical: 20,
+  },
+  headerSection: {
     alignItems: 'center',
-    width: '100%',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
   },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#000',
-    textAlign: 'center',
-  },
-  whiteBridge: {
-    backgroundColor: '#fff',
-    height: 40,
-    width: '100%',
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-  },
-  container: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#000',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    marginTop: -40,
-  },
-  logo: {
-    width: '75%',
-    height: '25%',
-    borderRadius: 18,
-    marginBottom: 40,
-  },
-  input: {
-    width: '100%',
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 8,
+  elsLogo: {
+    fontSize: 48,
+    fontFamily: 'Mulish-Bold',
+    color: '#4CC2FF',
     marginBottom: 20,
-    backgroundColor: '#fff',
-    fontSize: 16,
-    color: '#333',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
-  signupButton: {
-    backgroundColor: '#4CC2FF',
-    width: 200,
-    borderRadius: 8,
-    paddingVertical: 14,
-    marginTop: 10,
+  centeredHeading: {
+    fontSize: 24,
+    fontFamily: 'Mulish-Bold',
+    color: '#ededed',
+    textAlign: 'center',
+    marginBottom: 20,
   },
-  signupButtonTitle: {
-    color: '#333',
-    fontSize: 18,
+  inputContainer: {
+    marginBottom: 20,
   },
-  loginTextContainer: {
-    flexDirection: 'row',
-    marginTop: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  loginLink: {
-    color: '#FF4C4C',
-    fontWeight: 'bold',
-    textDecorationLine: 'underline',
-    fontSize: 16,
+  label: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Medium',
+    marginBottom: 8,
+    color: '#ededed',
   },
   passwordContainer: {
-    width: '100%',
+    position: 'relative',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    padding: 4,
+  },
+  linkText: {
+    color: '#4CC2FF',
+    fontFamily: 'Mulish-Bold',
+  },
+  headerNav: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    zIndex: 10,
+    backgroundColor: 'transparent',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontFamily: 'Mulish-Medium',
+    color: '#ededed',
   },
 });

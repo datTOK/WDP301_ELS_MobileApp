@@ -7,18 +7,21 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-} from "react-native";
-import { Card, Button, Icon } from "react-native-elements";
-import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "../context/AuthContext";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MOBILE_SERVER_URL } from "@env";
-
-const API_BASE_URL = "http://localhost:4000/api";
+} from 'react-native';
+import { Card, Button, Icon } from 'react-native-elements';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import LoadingSpinner from "../components/LoadingSpinner";
+import { courseService, userLessonService, apiUtils } from "../services";
 
 const CourseLessonScreen = ({ route, navigation }) => {
   const { courseId, courseName } = route.params;
   const { userToken } = useAuth();
+  const { theme } = useTheme();
+  const { showError } = useToast();
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,26 +36,21 @@ const CourseLessonScreen = ({ route, navigation }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(
-        `${MOBILE_SERVER_URL}api/courses/${courseId}/lessons`,
-        {
-          headers: { Authorization: `Bearer ${userToken}` },
-        }
-      );
+      const response = await courseService.getCourseLessons(courseId);
+      const result = apiUtils.parseResponse(response);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to fetch lessons");
+      if (!result.data) {
+        throw new Error(result.message || "Failed to fetch lessons");
       }
 
-      const lessonsData = data.data || [];
+      const lessonsData = result.data || [];
       setLessons(lessonsData);
 
       // Fetch completion status for each lesson
       await fetchLessonCompletionStatus(lessonsData);
     } catch (err) {
-      setError(err.message);
+      const errorInfo = apiUtils.handleError(err);
+      setError(errorInfo.message);
     } finally {
       setLoading(false);
     }
@@ -62,21 +60,16 @@ const CourseLessonScreen = ({ route, navigation }) => {
     try {
       const completionPromises = lessonsData.map(async (lesson) => {
         try {
-          const response = await fetch(
-            `${MOBILE_SERVER_URL}api/user-lessons/${lesson._id}/lesson`,
-            {
-              headers: { Authorization: `Bearer ${userToken}` },
-            }
-          );
-
-          if (response.ok) {
-            const data = await response.json();
+          const response = await userLessonService.getUserLessonByLessonId(lesson._id);
+          const result = apiUtils.parseResponse(response);
+          
+          if (result.data) {
             // Use userLesson.status and userLesson.currentOrder from API
             return {
               lessonId: lesson._id,
-              completed: data.userLesson?.status === "completed",
-              currentOrder: data.userLesson?.currentOrder || [],
-              status: data.userLesson?.status || "ongoing",
+              completed: result.data.userLesson?.status === "completed",
+              currentOrder: result.data.userLesson?.currentOrder || [],
+              status: result.data.userLesson?.status || "ongoing",
             };
           }
           return {
@@ -117,30 +110,19 @@ const CourseLessonScreen = ({ route, navigation }) => {
 
   const updateLessonStatus = async (lessonId, status) => {
     try {
-      const lessonResponse = await fetch(
-        `${MOBILE_SERVER_URL}api/user-lessons/${lessonId}/lesson`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userToken}`,
-          },
-        }
-      );
-      const lessonData = await lessonResponse.json();
+      const lessonResponse = await userLessonService.getUserLessonByLessonId(lessonId);
+      const lessonResult = apiUtils.parseResponse(lessonResponse);
 
-      const response = await fetch(
-        `${MOBILE_SERVER_URL}api/user-lessons/${lessonData?.userLesson?._id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userToken}`,
-          },
-          body: JSON.stringify({ status }),
-        }
+      if (!lessonResult.data?.userLesson?._id) {
+        return false;
+      }
+
+      const response = await userLessonService.updateUserLesson(
+        lessonResult.data.userLesson._id,
+        { status }
       );
 
-      if (response.ok) {
+      if (response.status === 200) {
         // Update local state
         setLessonProgress((prev) => ({
           ...prev,
@@ -251,12 +233,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading lessons...</Text>
-      </View>
-    );
+    return <LoadingSpinner fullScreen text="Loading lessons..." />;
   }
 
   if (error) {

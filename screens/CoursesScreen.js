@@ -2,27 +2,29 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  FlatList,
-  ActivityIndicator,
   StyleSheet,
-  Alert,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
   KeyboardAvoidingView,
   Platform,
-  RefreshControl,
   Image,
   Dimensions,
-  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
-import { Card, Button, SearchBar } from "react-native-elements";
-import { MOBILE_SERVER_URL } from "@env";
+import { useToast } from "../context/ToastContext";
+import { SearchBar } from "react-native-elements";
+import LoadingSpinner from "../components/LoadingSpinner";
+import { courseService, apiUtils } from "../services";
 
 const { width } = Dimensions.get("window");
-const API_BASE_URL = "http://localhost:4000/api";
 
 const CourseItem = ({ course, navigation }) => {
   const [imageError, setImageError] = useState(false);
+
   return (
     <TouchableOpacity
       style={courseItemStyles.cardContainer}
@@ -150,18 +152,17 @@ export default function CoursesScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-
   const [page, setPage] = useState(1);
   const [size] = useState(5);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-
   const [order, setOrder] = useState("asc");
   const [sortBy, setSortBy] = useState("date");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const { userToken } = useAuth();
+  const { showError } = useToast();
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -174,55 +175,36 @@ export default function CoursesScreen({ navigation }) {
     setLoading(true);
     setError(null);
     try {
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        size: size.toString(),
+      const params = {
+        page,
+        size,
         order,
         sortBy,
-      });
+        ...(debouncedSearch && { search: debouncedSearch }),
+      };
 
-      if (debouncedSearch) {
-        queryParams.append("search", debouncedSearch);
-      }
+      const response = await courseService.getCourses(params);
+      const result = apiUtils.parseResponse(response);
 
-      const url = `${MOBILE_SERVER_URL}api/courses?${queryParams.toString()}`;
-
-      const response = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        const coursesData = result.data;
-        if (coursesData && Array.isArray(coursesData)) {
-          setCourses(coursesData);
-          setTotal(result.total || 0);
-          setTotalPages(result.totalPages || 0);
-        } else {
-          setCourses([]);
-          setTotal(0);
-          setTotalPages(0);
-          Alert.alert(
-            "Data Error",
-            result.message || "Unexpected data structure."
-          );
-        }
+      if (result.data && Array.isArray(result.data)) {
+        setCourses(result.data);
+        setTotal(result.total || 0);
+        setTotalPages(result.totalPages || 0);
       } else {
-        setError(result.message || "Failed to fetch courses.");
         setCourses([]);
+        setTotal(0);
+        setTotalPages(0);
+        showError('Data Error', 'Unexpected data structure.');
       }
     } catch (err) {
-      setError("Network error. Could not connect to the server.");
+      const errorInfo = apiUtils.handleError(err);
+      setError(errorInfo.message);
       setCourses([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [page, size, order, sortBy, debouncedSearch, userToken]);
+  }, [page, size, order, sortBy, debouncedSearch, showError]);
 
   useEffect(() => {
     fetchCourses();
@@ -314,6 +296,10 @@ export default function CoursesScreen({ navigation }) {
     </View>
   );
 
+  if (loading && !refreshing) {
+    return <LoadingSpinner fullScreen text="Loading courses..." />;
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -395,12 +381,7 @@ export default function CoursesScreen({ navigation }) {
         </View>
       </View>
 
-      {loading && courses.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007bff" />
-          <Text style={styles.loadingText}>Loading courses...</Text>
-        </View>
-      ) : error ? (
+      {error ? (
         <View style={styles.errorContainer}>
           <View style={styles.errorIcon}>
             <Ionicons name="alert-circle" size={48} color="#ff6b6b" />
@@ -531,17 +512,6 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingVertical: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: "#888",
-    fontWeight: "500",
   },
   errorContainer: {
     flex: 1,

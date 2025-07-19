@@ -15,10 +15,12 @@ import {
 import { Card, Button, Icon, Overlay, Chip } from "react-native-elements";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MOBILE_SERVER_URL } from "@env";
 import prettyFormat from "pretty-format";
 import axios from "axios";
+import { lessonService, userLessonService, userExerciseService, testService, apiUtils } from "../services";
+
 const ExerciseItem = ({
   exercise,
   onSubmission,
@@ -36,6 +38,7 @@ const ExerciseItem = ({
   const [feedbackExplanation, setFeedbackExplanation] = useState("");
 
   const { userToken } = useAuth();
+  const { showError, showSuccess, showWarning } = useToast();
 
   // Reset exercise state when exercise changes
   useEffect(() => {
@@ -71,52 +74,46 @@ const ExerciseItem = ({
 
   const checkAnswer = async () => {
     if (!userAnswer.trim() && !selectedOption) {
-      Alert.alert("Error", "Please provide an answer before submitting.");
+      showError('Error', 'Please provide an answer before submitting.');
       return;
     }
 
     setIsSubmitting(true);
+
+    // Local validation for immediate feedback
+    const isAnswerCorrect =
+      exercise.options && exercise.options.length > 0
+        ? selectedOption === exercise.answer[0]
+        : userAnswer.trim().toLowerCase() === exercise.answer[0].toLowerCase();
+
     const answer =
       exercise.options && exercise.options.length > 0
         ? selectedOption
         : userAnswer.trim();
 
     try {
-      const response = await fetch(
-        `${MOBILE_SERVER_URL}api/user-exercises/submission`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userToken}`,
-          },
-          body: JSON.stringify({
-            id: exercise._id,
-            answer: answer,
-          }),
-        }
-      );
+      const response = await userExerciseService.submitExercise({
+        id: exercise._id,
+        answer: answer,
+      });
+      
+      const result = apiUtils.parseResponse(response);
 
-      const result = await response.json();
-
-      if (
-        (response.ok || response.status === 201) &&
-        result.message === "Correct answer"
-      ) {
+      if (result.data && result.message === "Correct answer") {
         setIsCorrect(true);
         setIsSubmitted(true);
         setShowFeedback(true);
         setFeedbackMessage(result.message);
         // Try to get explanation from result, fallback to exercise.explanation
         setFeedbackExplanation(
-          result.userExercise?.exercise?.explanation ||
-            result.explanation ||
+          result.data.userExercise?.exercise?.explanation ||
+            result.data.explanation ||
             exercise.explanation ||
             ""
         );
 
         if (onSubmission) {
-          onSubmission(exercise._id, result.isCorrect);
+          onSubmission(exercise._id, result.data.isCorrect);
         }
 
         if (onExerciseCompleted) {
@@ -132,14 +129,19 @@ const ExerciseItem = ({
         setFeedbackMessage("Incorrect");
         // Try to get explanation from result, fallback to exercise.explanation
         setFeedbackExplanation(
-          result.userExercise?.exercise?.explanation ||
-            result.explanation ||
+          result.data.userExercise?.exercise?.explanation ||
+            result.data.explanation ||
             exercise.explanation ||
             ""
         );
       }
     } catch (error) {
-      Alert.alert("Error", "Network error. Please try again.");
+      const errorInfo = apiUtils.handleError(error);
+      showError('Error', errorInfo.message);
+      // Show local validation result even if API fails
+      if (onExerciseCompleted) {
+        onExerciseCompleted(exercise._id, isAnswerCorrect);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -400,23 +402,16 @@ const CourseDetailScreen = ({ route, navigation }) => {
   const createUserLesson = async () => {
     try {
       const userId = await AsyncStorage.getItem("userId");
-      const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({
-          userId: userId,
-          lessonId: lessonId,
-        }),
+      const response = await userLessonService.createUserLesson({
+        userId: userId,
+        lessonId: lessonId,
       });
 
       console.log("Create user lesson response status:", response.status);
-      const result = await response.json();
+      const result = apiUtils.parseResponse(response);
       console.log("Create user lesson response data:", result);
 
-      if (response.ok) {
+      if (result.data) {
         console.log("User lesson created successfully");
         return true;
       } else {
@@ -437,45 +432,26 @@ const CourseDetailScreen = ({ route, navigation }) => {
 
     // Check if lesson is already completed from API
     if (userLesson?.completed) {
-      Alert.alert(
-        "Already Completed",
-        "This lesson has already been completed. You can review the content but cannot mark it as completed again."
-      );
+      showWarning('Already Completed', 'This lesson has already been completed. You can review the content but cannot mark it as completed again.');
       return;
     }
 
     if (!isLessonFullyCompleted()) {
-      Alert.alert(
-        "Incomplete",
-        "Please complete all exercises correctly before marking this lesson as completed."
-      );
+      showWarning('Incomplete', 'Please complete all exercises correctly before marking this lesson as completed.');
       return;
     }
 
     if (updateLessonStatus) {
       const success = await updateLessonStatus(lessonId, "completed");
       if (success) {
-        setCompletedLessons((prev) =>
-          prev.includes(lessonId) ? prev : [...prev, lessonId]
-        );
-        Alert.alert(
-          "Success",
-          "Lesson completed! You can now proceed to the next lesson."
-        );
+        setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+        showSuccess('Success', 'Lesson completed! You can now proceed to the next lesson.');
       } else {
-        Alert.alert(
-          "Error",
-          "Failed to update lesson status. Please try again."
-        );
+        showError('Error', 'Failed to update lesson status. Please try again.');
       }
     } else {
-      setCompletedLessons((prev) =>
-        prev.includes(lessonId) ? prev : [...prev, lessonId]
-      );
-      Alert.alert(
-        "Success",
-        "Lesson completed! You can now proceed to the next lesson."
-      );
+      setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+      showSuccess('Success', 'Lesson completed! You can now proceed to the next lesson.');
     }
   };
 
@@ -484,43 +460,31 @@ const CourseDetailScreen = ({ route, navigation }) => {
     try {
       const userId = await AsyncStorage.getItem("userId");
       // Try to fetch userLesson first
-      const getRes = await fetch(
-        `${MOBILE_SERVER_URL}api/user-lessons/${lessonId}`,
-        {
-          headers: { Authorization: `Bearer ${userToken}` },
-        }
-      );
-      if (getRes.ok) {
-        const userLessonData = await getRes.json();
-        console.log("Fetched user lesson data:", userLessonData);
-        setUserLesson(userLessonData.userLesson || null);
+      try {
+        const response = await userLessonService.getUserLessonByLessonId(lessonId);
+        const result = apiUtils.parseResponse(response);
+        console.log("Fetched user lesson data:", result);
+        setUserLesson(result.data.userLesson || null);
         console.log(
           "Lesson completion status:",
-          userLessonData.userLesson?.completed
+          result.data.userLesson?.completed
         );
-        return userLessonData.userLesson;
-      } else {
+        return result.data.userLesson;
+      } catch (error) {
         // If not found, create it
-        const response = await fetch(`${MOBILE_SERVER_URL}api/user-lessons`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userToken}`,
-          },
-          body: JSON.stringify({
-            userId: userId,
-            lessonId: lessonId,
-          }),
+        const createResponse = await userLessonService.createUserLesson({
+          userId: userId,
+          lessonId: lessonId,
         });
-        const result = await response.json();
-        if (response.ok) {
+        const result = apiUtils.parseResponse(createResponse);
+        if (result.data) {
           console.log("Created user lesson data:", result);
-          setUserLesson(result.userLesson || null);
+          setUserLesson(result.data.userLesson || null);
           console.log(
             "New lesson completion status:",
-            result.userLesson?.completed
+            result.data.userLesson?.completed
           );
-          return result.userLesson;
+          return result.data.userLesson;
         } else {
           setUserLesson(null);
           return null;
@@ -550,62 +514,26 @@ const CourseDetailScreen = ({ route, navigation }) => {
         exerciseResponse,
         testsResponse,
       ] = await Promise.all([
-        //add await avoid failed api
-        await fetch(`${MOBILE_SERVER_URL}api/lessons/${lessonId}`, {
-          headers: { Authorization: `Bearer ${userToken}` },
-        }),
-
-        await fetch(`${MOBILE_SERVER_URL}api/lessons/${lessonId}/grammars`, {
-          headers: { Authorization: `Bearer ${userToken}` },
-        }),
-
-        await fetch(
-          `${MOBILE_SERVER_URL}api/lessons/${lessonId}/vocabularies`,
-          {
-            headers: { Authorization: `Bearer ${userToken}` },
-          }
-        ),
-
-        await fetch(`${MOBILE_SERVER_URL}api/exercises/${lessonId}/lesson`, {
-          headers: { Authorization: `Bearer ${userToken}` },
-        }),
-
-        await fetch(`${MOBILE_SERVER_URL}api/tests/${courseId}/course`, {
-          headers: { Authorization: `Bearer ${userToken}` },
-        }),
+        lessonService.getLessonById(lessonId),
+        lessonService.getLessonGrammars(lessonId),
+        lessonService.getLessonVocabulary(lessonId),
+        lessonService.getLessonExercises(lessonId),
+        testService.getCourseTests(courseId),
       ]);
 
-      // console.log("Lesson Response Status:", lessonResponse.status);
-      // console.log("Grammar Response Status:", grammarResponse.status);
-      // console.log("Vocab Response Status:", vocabResponse.status);
-      // console.log("Exercise Response Status:", exerciseResponse.status);
-      // console.log("Tests Response Status:", testsResponse.status);
-
-      const lessonData = await lessonResponse.json();
-      const grammarData = await grammarResponse.json();
-      const vocabData = await vocabResponse.json();
-      const exerciseData = await exerciseResponse.json();
-      const testsData = await testsResponse.json();
-
-      // console.log("Lesson Response Data:", prettyFormat(lessonData));
-      // console.log("Grammar Response Data:", prettyFormat(grammarData));
-      // console.log("Vocab Response Data:", prettyFormat(vocabData));
-      // console.log("Exercise Response Data:", prettyFormat(exerciseData));
-      // console.log("Tests Response Data:", prettyFormat(testsData));
+      const lessonData = apiUtils.parseResponse(lessonResponse);
+      const grammarData = apiUtils.parseResponse(grammarResponse);
+      const vocabData = apiUtils.parseResponse(vocabResponse);
+      const exerciseData = apiUtils.parseResponse(exerciseResponse);
+      const testsData = apiUtils.parseResponse(testsResponse);
 
       if (
-        !lessonResponse.ok ||
-        !grammarResponse.ok ||
-        !vocabResponse.ok ||
-        !exerciseResponse.ok ||
-        !testsResponse.ok
+        !lessonData.data ||
+        !grammarData.data ||
+        !vocabData.data ||
+        !exerciseData.data ||
+        !testsData.data
       ) {
-        // console.log("One or more API calls failed");
-        // console.log("Lesson Response OK:", lessonResponse.ok);
-        // console.log("Grammar Response OK:", grammarResponse.ok);
-        // console.log("Vocab Response OK:", vocabResponse.ok);
-        // console.log("Exercise Response OK:", exerciseResponse.ok);
-        // console.log("Tests Response OK:", testsResponse.ok);
         throw new Error("Failed to fetch lesson details");
       }
 
@@ -975,12 +903,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
   );
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading lesson...</Text>
-      </View>
-    );
+    return <LoadingSpinner fullScreen text="Loading lesson..." />;
   }
 
   if (error) {

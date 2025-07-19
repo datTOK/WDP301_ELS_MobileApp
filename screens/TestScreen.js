@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  ActivityIndicator,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
-import { Card, Button, Icon, Overlay, Chip } from 'react-native-elements';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Card, Button, Overlay } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { MOBILE_SERVER_URL } from '@env';
-
+import { useToast } from '../context/ToastContext';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { testsAPI, apiUtils } from '../services';
 
 const TestItem = ({ test, isReadOnly = true }) => {
   const [showAnswer, setShowAnswer] = useState(false);
@@ -26,69 +20,79 @@ const TestItem = ({ test, isReadOnly = true }) => {
       <View style={testItemStyles.questionContainer}>
         <Text style={testItemStyles.questionText}>{test.question}</Text>
       </View>
-
-      {test.options && test.options.length > 0 ? (
-        <View style={testItemStyles.optionsContainer}>
-          {test.options.map((option, index) => (
-            <View
-              key={index}
-              style={[
-                testItemStyles.optionButton,
-                option === test.answer[0] && testItemStyles.correctOption,
-              ]}
-            >
-              <Text style={[
-                testItemStyles.optionText,
-                option === test.answer[0] && testItemStyles.correctOptionText,
-              ]}>
-                {option}
-              </Text>
-              {option === test.answer[0] && (
-                <Ionicons name="checkmark-circle" size={20} color="#28a745" style={testItemStyles.correctIcon} />
-              )}
-            </View>
-          ))}
-        </View>
-      ) : (
-        <View style={testItemStyles.textAnswerContainer}>
-          <Text style={testItemStyles.answerLabel}>Correct Answer:</Text>
-          <Text style={testItemStyles.correctAnswerText}>
-            {Array.isArray(test.answer) ? test.answer.join(', ') : test.answer}
-          </Text>
-        </View>
-      )}
-
-      <View style={testItemStyles.actionButtons}>
-        <Button
-          title={showAnswer ? "Hide Explanation" : "Show Explanation"}
-          buttonStyle={testItemStyles.explanationButton}
-          titleStyle={testItemStyles.explanationButtonText}
-          onPress={toggleAnswer}
-        />
+      <View style={testItemStyles.optionsContainer}>
+        {test.options && test.options.map((option, index) => (
+          <View
+            key={index}
+            style={[
+              testItemStyles.optionButton,
+              test.correctAnswer === option && testItemStyles.correctOption,
+            ]}
+          >
+            <Text style={{ color: '#fff', flex: 1 }}>{option}</Text>
+            {test.correctAnswer === option && (
+              <Ionicons name="checkmark-circle" size={20} color="#28a745" />
+            )}
+          </View>
+        ))}
       </View>
-
-      {showAnswer && test.explanation && (
-        <View style={testItemStyles.explanationContainer}>
-          <Text style={testItemStyles.explanationText}>
-            Explanation: {test.explanation}
+      {isReadOnly && (
+        <TouchableOpacity onPress={toggleAnswer} style={{ marginTop: 10 }}>
+          <Text style={{ color: '#4CC2FF', textAlign: 'center' }}>
+            {showAnswer ? 'Hide Answer' : 'Show Answer'}
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
     </View>
   );
 };
 
+const testItemStyles = StyleSheet.create({
+  container: {
+    marginBottom: 15,
+    padding: 15,
+    backgroundColor: '#333',
+    borderRadius: 8,
+  },
+  questionContainer: {
+    marginBottom: 15,
+  },
+  questionText: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+    color: '#fff',
+    lineHeight: 22,
+  },
+  optionsContainer: {
+    marginTop: 10,
+  },
+  optionButton: {
+    backgroundColor: '#555',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  correctOption: {
+    backgroundColor: '#28a745',
+    borderColor: '#28a745',
+    borderWidth: 2,
+  },
+});
+
 const TestScreen = ({ route, navigation }) => {
-  const { courseId, courseName } = route.params;
-  const { userToken } = useAuth();
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalIndex, setModalIndex] = useState(0);
+  const [selectedTestIndex, setSelectedTestIndex] = useState(0);
+  const { userToken } = useAuth();
+  const { showError } = useToast();
 
   const openModal = (index) => {
-    setModalIndex(index);
+    setSelectedTestIndex(index);
     setModalVisible(true);
   };
 
@@ -98,65 +102,62 @@ const TestScreen = ({ route, navigation }) => {
     setLoading(true);
     setError(null);
     try {
-      console.log('Fetching tests for courseId:', courseId);
-      
-      const response = await fetch(`${MOBILE_SERVER_URL}api/tests/${courseId}/course`, {
-        headers: { 'Authorization': `Bearer ${userToken}` },
-      });
+      const response = await testsAPI.getCourseTests(route.params?.courseId || 'default');
+      const result = apiUtils.parseResponse(response);
 
-      console.log('Tests Response Status:', response.status);
-      const result = await response.json();
-      console.log('Tests Response Data:', result);
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to fetch tests');
+      if (result.data && Array.isArray(result.data)) {
+        setTests(result.data);
+      } else {
+        setTests([]);
+        showError('Data Error', 'No tests found for this course.');
       }
-
-      setTests(result.data || []);
     } catch (err) {
-      setError(err.message);
+      const errorInfo = apiUtils.handleError(err);
+      setError(errorInfo.message);
+      setTests([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (courseId) {
-      fetchTests();
-    }
-  }, [courseId, userToken]);
+    fetchTests();
+  }, []);
 
   const renderModalContent = () => {
-    if (!tests[modalIndex]) return null;
-    const test = tests[modalIndex];
+    if (tests.length === 0) return null;
 
+    const test = tests[selectedTestIndex];
     return (
       <View style={styles.modalContent}>
         <View style={styles.modalNavRow}>
-          <View style={styles.modalNavSpacer} />
-          <Text style={styles.modalTitle}>Test Question {modalIndex + 1}</Text>
-          <TouchableOpacity
-            disabled={modalIndex === tests.length - 1}
-            onPress={() => setModalIndex((i) => Math.min(tests.length - 1, i + 1))}
-          >
-            <Ionicons name="arrow-forward-circle" size={32} color={modalIndex === tests.length - 1 ? '#ccc' : '#007AFF'} />
+          <TouchableOpacity onPress={closeModal}>
+            <Ionicons name="close" size={24} color="#fff" />
           </TouchableOpacity>
+          <Text style={styles.modalTitle}>Test {selectedTestIndex + 1}</Text>
+          <View style={styles.modalNavSpacer} />
         </View>
         <View style={styles.modalBody}>
           <TestItem test={test} isReadOnly={true} />
         </View>
-        <Button title="Close" onPress={closeModal} buttonStyle={styles.closeModalButton} />
+        <Button
+          title="Take Test"
+          buttonStyle={styles.closeModalButton}
+          titleStyle={{ color: '#fff', fontFamily: 'Mulish-Bold' }}
+          onPress={() => {
+            closeModal();
+            navigation.navigate('TestScreenDetail', { 
+              testId: test._id, 
+              testName: test.name || `Test ${selectedTestIndex + 1}` 
+            });
+          }}
+        />
       </View>
     );
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading tests...</Text>
-      </View>
-    );
+    return <LoadingSpinner fullScreen text="Loading tests..." />;
   }
 
   if (error) {
@@ -176,54 +177,47 @@ const TestScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Course Tests</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Content */}
-      <ScrollView
-        style={styles.contentContainer}
-        contentContainerStyle={styles.contentScrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={styles.contentContainer} contentContainerStyle={styles.contentScrollContainer}>
         <Card containerStyle={styles.card}>
-          <Card.Title style={styles.cardTitle}>{courseName} - Tests</Card.Title>
-          {/* Removed static description as per requirements */}
-          
-          {tests.length === 0 ? (
-            <View style={styles.noTestsContainer}>
-              <Ionicons name="document-text-outline" size={50} color="#ccc" />
-              <Text style={styles.noTestsText}>You haven't done any test yet. Please go back and do a test.</Text>
-            </View>
-          ) : (
+          <Card.Title style={styles.cardTitle}>Available Tests</Card.Title>
+          <Text style={styles.description}>
+            Test your knowledge with these interactive quizzes. Each test contains multiple-choice questions to help you assess your understanding of the course material.
+          </Text>
+
+          {tests.length > 0 ? (
             <View style={styles.testsSection}>
-              <Text style={styles.sectionTitle}>Available Tests ({tests.length})</Text>
+              <Text style={styles.sectionTitle}>Select a Test</Text>
               <View style={styles.chipRow}>
                 {tests.map((test, index) => (
-                  <Chip
-                    key={index}
-                    title={`Question ${index + 1}`}
+                  <Button
+                    key={test._id || index}
+                    title={`Test ${index + 1}`}
+                    type="outline"
                     buttonStyle={styles.chipButton}
                     titleStyle={styles.chipTitle}
-                    onPress={() => navigation.navigate('TestScreenDetail', { testId: test._id, testName: test.name })}
-                    icon={{ name: 'help-circle', type: 'feather', color: '#fff', size: 16 }}
+                    onPress={() => openModal(index)}
                   />
                 ))}
               </View>
               <Button
                 title="Take Test"
                 buttonStyle={{ backgroundColor: '#28a745', borderRadius: 8, marginTop: 20 }}
-                titleStyle={{ color: '#fff', fontWeight: 'bold' }}
+                titleStyle={{ color: '#fff', fontFamily: 'Mulish-Bold' }}
                 onPress={() => navigation.navigate('TestScreenDetail', { testId: tests[0]._id, testName: tests[0].name })}
               />
+            </View>
+          ) : (
+            <View style={styles.noTestsContainer}>
+              <Ionicons name="document-text-outline" size={50} color="#888" />
+              <Text style={styles.noTestsText}>No tests available for this course yet.</Text>
             </View>
           )}
         </Card>
@@ -267,7 +261,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: 'Mulish-Bold',
     color: '#fff',
     flex: 1,
     textAlign: 'center',
@@ -296,7 +290,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: 'Mulish-Bold',
     color: '#fff',
     textAlign: 'center',
   },
@@ -312,7 +306,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Mulish-Bold',
     color: '#bbb',
     marginBottom: 10,
     textAlign: 'center',
@@ -330,7 +324,7 @@ const styles = StyleSheet.create({
   },
   chipTitle: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontFamily: 'Mulish-Bold',
   },
   noTestsContainer: {
     alignItems: 'center',
@@ -374,7 +368,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Mulish-Bold',
   },
   modalOverlay: {
     width: '90%',
@@ -410,7 +404,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Mulish-Bold',
     color: '#fff',
     flex: 1,
     textAlign: 'center',
@@ -425,93 +419,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     borderRadius: 8,
     marginTop: 10,
-  },
-});
-
-const testItemStyles = StyleSheet.create({
-  container: {
-    marginBottom: 15,
-    padding: 15,
-    backgroundColor: '#333',
-    borderRadius: 8,
-  },
-  questionContainer: {
-    marginBottom: 15,
-  },
-  questionText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    lineHeight: 22,
-  },
-  optionsContainer: {
-    marginTop: 10,
-  },
-  optionButton: {
-    backgroundColor: '#555',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  correctOption: {
-    backgroundColor: '#28a745',
-    borderColor: '#28a745',
-    borderWidth: 2,
-  },
-  optionText: {
-    color: '#fff',
-    fontSize: 14,
-    flex: 1,
-  },
-  correctOptionText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  correctIcon: {
-    marginLeft: 10,
-  },
-  textAnswerContainer: {
-    marginTop: 10,
-    padding: 12,
-    backgroundColor: '#28a745',
-    borderRadius: 8,
-  },
-  answerLabel: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  correctAnswerText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  actionButtons: {
-    marginTop: 15,
-  },
-  explanationButton: {
-    backgroundColor: '#6c757d',
-    borderRadius: 8,
-  },
-  explanationButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  explanationContainer: {
-    marginTop: 15,
-    padding: 12,
-    backgroundColor: '#444',
-    borderRadius: 8,
-  },
-  explanationText: {
-    color: '#ccc',
-    fontSize: 14,
-    lineHeight: 20,
   },
 });
 

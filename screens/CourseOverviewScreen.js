@@ -13,13 +13,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-import { MOBILE_SERVER_URL } from "@env";
-
-const API_BASE_URL = "http://localhost:4000/api";
+import { courseService, userLessonService, apiUtils } from "../services";
 
 const CourseOverviewScreen = ({ route, navigation }) => {
+    const { showError, showSuccess, showWarning } = useToast();
   const { courseId } = route.params;
-  const { userToken } = useAuth();
+  const { userToken, userId } = useAuth();
   const [courseInfo, setCourseInfo] = useState({
     title: "",
     description: "",
@@ -30,27 +29,26 @@ const CourseOverviewScreen = ({ route, navigation }) => {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [userId, setUserId] = useState(null);
   const [enrollLoading, setEnrollLoading] = useState(false);
   const [completedLessons, setCompletedLessons] = useState(0);
   const [lessons, setLessons] = useState([]);
   const [tests, setTests] = useState([]);
 
-  useEffect(() => {
-    const initialize = async () => {
-      try {
-        const storedUserId = await AsyncStorage.getItem("userId");
-        if (storedUserId) {
-          setUserId(storedUserId);
-        } else {
-          setError("User ID not found in storage.");
-        }
-      } catch (err) {
-        setError("Failed to retrieve user data from storage.");
+  const initialize = async () => {
+    try {
+      if (!userId) {
+        setError("User ID not found");
+        return;
       }
-    };
+      await fetchData();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  useEffect(() => {
     initialize();
-  }, [courseId]);
+  }, [courseId, userToken]);
 
   const getCourseDifficulty = (level) => {
     switch (level) {
@@ -74,93 +72,63 @@ const CourseOverviewScreen = ({ route, navigation }) => {
   };
   const fetchData = useCallback(async () => {
     if (!userId) {
-      setError("User ID is required to fetch data.");
-      setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
     try {
       // First, check enrollment status
-      const enrollmentResponse = await fetch(
-        `${MOBILE_SERVER_URL}api/user-courses/${courseId}/course`,
-        {
-          headers: { Authorization: `Bearer ${userToken}` },
-        }
-      );
+      try {
+        const enrollmentResponse = await courseService.getUserCourseByCourseId(courseId);
+        const enrollmentResult = apiUtils.parseResponse(enrollmentResponse);
+        setIsEnrolled(true);
+      } catch (error) {
+        // Not enrolled
+        setIsEnrolled(false);
+      }
 
       // Fetch course info, lessons, and tests regardless of enrollment
       const [courseResponse, lessonsResponse, testsResponse] =
         await Promise.all([
-          fetch(`${MOBILE_SERVER_URL}api/courses/${courseId}`, {
-            headers: { Authorization: `Bearer ${userToken}` },
-          }),
-          fetch(`${MOBILE_SERVER_URL}api/courses/${courseId}/lessons`, {
-            headers: { Authorization: `Bearer ${userToken}` },
-          }),
-          fetch(`${MOBILE_SERVER_URL}api/tests/${courseId}/course`, {
-            headers: { Authorization: `Bearer ${userToken}` },
-          }),
+          courseService.getCourseById(courseId),
+          courseService.getCourseLessons(courseId),
+          courseService.getCourseTests(courseId),
         ]);
 
-      console.log("Course Response Status:", courseResponse.status);
-      console.log("Lessons Response Status:", lessonsResponse.status);
-      console.log("Tests Response Status:", testsResponse.status);
+      const courseData = apiUtils.parseResponse(courseResponse);
+      const lessonsData = apiUtils.parseResponse(lessonsResponse);
+      const testsData = apiUtils.parseResponse(testsResponse);
 
-      if (!courseResponse.ok) throw new Error("Failed to fetch course info");
+      if (!courseData.data) throw new Error("Failed to fetch course info");
 
-      const courseData = await courseResponse.json();
-      const course = courseData.course;
+      const course = courseData.data.course || courseData.data;
+      const lessons = lessonsData.data || [];
+      const tests = testsData.data || [];
 
-      let lessonsData = [];
-      let testsData = [];
+      setLessons(lessons);
+      setTests(tests);
 
-      if (lessonsResponse.ok) {
-        const lessonsResult = await lessonsResponse.json();
-        lessonsData = lessonsResult.data || [];
-        console.log("Lessons data:", lessonsData);
-      }
-
-      if (testsResponse.ok) {
-        const testsResult = await testsResponse.json();
-        testsData = testsResult.data || [];
-        console.log("Tests data:", testsData);
-      }
-
-      setLessons(lessonsData);
-      setTests(testsData);
-
-      if (enrollmentResponse.status === 404) {
-        // Not enrolled
-        setIsEnrolled(false);
+      if (!isEnrolled) {
         setCourseInfo({
           title: course.name,
           description: course.description,
           difficulty: getCourseDifficulty(course.level),
-          numLessons: lessonsData.length,
-          totalTests: testsData.length,
+          numLessons: lessons.length,
+          totalTests: tests.length,
         });
         setCompletedLessons(0);
-      } else if (enrollmentResponse.status === 200) {
+      } else {
         // Enrolled - fetch user progress
-        setIsEnrolled(true);
-
-        // Fetch user lesson progress using the same logic as CourseLessonScreen
-        const completionPromises = lessonsData.map(async (lesson) => {
+        const completionPromises = lessons.map(async (lesson) => {
           try {
-            const response = await fetch(
-              `${MOBILE_SERVER_URL}api/user-lessons/${lesson._id}/lesson`,
-              {
-                headers: { Authorization: `Bearer ${userToken}` },
-              }
-            );
-
-            if (response.ok) {
-              const data = await response.json();
+            const response = await userLessonService.getUserLessonByLessonId(lesson._id);
+            const result = apiUtils.parseResponse(response);
+            
+            if (result.data) {
               return {
                 lessonId: lesson._id,
-                completed: data.userLesson?.status === "completed",
-                status: data.userLesson?.status || "ongoing",
+                completed: result.data.userLesson?.status === "completed",
+                status: result.data.userLesson?.status || "ongoing",
               };
             }
             return {
@@ -183,22 +151,18 @@ const CourseOverviewScreen = ({ route, navigation }) => {
           (result) => result.completed
         ).length;
 
-        console.log("Completion results:", completionResults);
-        console.log("Completed lessons count:", completedCount);
-        console.log("Total lessons:", lessonsData.length);
         setCompletedLessons(completedCount);
 
         setCourseInfo({
           title: course.name,
           description: course.description,
-          numLessons: lessonsData.length,
-          totalTests: testsData.length,
+          numLessons: lessons.length,
+          totalTests: tests.length,
         });
-      } else {
-        throw new Error("Failed to check enrollment status");
       }
     } catch (err) {
-      setError(err.message);
+      const errorInfo = apiUtils.handleError(err);
+      setError(errorInfo.message);
     } finally {
       setLoading(false);
     }
@@ -219,35 +183,33 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     }, [userId, isEnrolled])
   );
 
-  const enrollInCourse = async () => {
-    if (!userId) {
-      Alert.alert("Error", "User ID is required to enroll.");
-      return;
-    }
-    setEnrollLoading(true);
-    try {
-      const response = await fetch(`${MOBILE_SERVER_URL}api/user-courses`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userToken}`,
-        },
-        body: JSON.stringify({ courseId, userId }),
-      });
-      const responseData = await response.json();
-      if (!response.ok) {
-        throw new Error(responseData.message || "Failed to enroll");
-      }
-      setIsEnrolled(true);
-      Alert.alert("Success", "You have enrolled in the course.");
-      fetchData();
-    } catch (err) {
-      Alert.alert("Error", err.message);
-    } finally {
-      setEnrollLoading(false);
-    }
-  };
+    const enrollInCourse = async () => {
+        if (!userId) {
+            showError('Error', 'User ID is required to enroll.');
+            return;
+        }
+        setEnrollLoading(true);
+        try {
+            const response = await courseService.enrollCourse({ courseId, userId });
+            const result = apiUtils.parseResponse(response);
+            if (result.data) {
+                setIsEnrolled(true);
+                showSuccess('Success', 'You have enrolled in the course.');
+                fetchData();
+            } else {
+                throw new Error(result.message || 'Failed to enroll');
+            }
+        } catch (err) {
+            const errorInfo = apiUtils.handleError(err);
+            showError('Error', errorInfo.message);
+        } finally {
+            setEnrollLoading(false);
+        }
+    };
 
+    if (loading) {
+        return <LoadingSpinner fullScreen text="Loading course overview..." />;
+    }
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
@@ -336,6 +298,77 @@ const CourseOverviewScreen = ({ route, navigation }) => {
           </Card>
         </View>
 
+                {/* Action Buttons */}
+                <Card containerStyle={styles.actionCard}>
+                    {!isEnrolled ? (
+                        <Button
+                            title="Enroll in Course"
+                            buttonStyle={styles.enrollButton}
+                            titleStyle={styles.buttonText}
+                            onPress={enrollInCourse}
+                            disabled={enrollLoading}
+                            icon={
+                                <Ionicons 
+                                    name="person-add" 
+                                    size={20} 
+                                    color="#fff" 
+                                    style={styles.buttonIcon}
+                                />
+                            }
+                        />
+                    ) : (
+                        <View style={styles.actionButtons}>
+                            <Button
+                                title="Continue Learning"
+                                buttonStyle={styles.primaryButton}
+                                titleStyle={styles.buttonText}
+                                onPress={() => navigation.navigate('CourseLesson', { courseId, courseName: courseInfo.title })}
+                                icon={
+                                    <Ionicons 
+                                        name="play" 
+                                        size={20} 
+                                        color="#fff" 
+                                        style={styles.buttonIcon}
+                                    />
+                                }
+                            />
+                            
+                            {courseInfo.totalTests > 0 && (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.testButton,
+                                        !canTakeTests && styles.testButtonDisabled
+                                    ]}
+                                    onPress={() => {
+                                        if (canTakeTests) {
+                                            navigation.navigate('TestScreen', { courseId, courseName: courseInfo.title });
+                                        } else {
+                                            showWarning(
+                                                'Tests Locked',
+                                                `Complete all ${courseInfo.numLessons} lessons to unlock tests.`,
+                                                [{ text: 'OK' }]
+                                            );
+                                        }
+                                    }}
+                                    disabled={!canTakeTests}
+                                >
+                                    <Ionicons 
+                                        name={canTakeTests ? "help-circle" : "lock-closed"} 
+                                        size={20} 
+                                        color={canTakeTests ? "#fff" : "#ccc"} 
+                                        style={styles.buttonIcon}
+                                    />
+                                    <Text style={[
+                                        styles.testButtonText,
+                                        !canTakeTests && styles.testButtonTextDisabled
+                                    ]}>
+                                        {canTakeTests ? 'Take Tests' : 'Tests Locked'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
+                </Card>
         {/* Action Buttons */}
         <Card containerStyle={styles.actionCard}>
           {!isEnrolled ? (

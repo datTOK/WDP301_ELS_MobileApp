@@ -1,375 +1,339 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView, TouchableOpacity } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../context/AuthContext'; 
-import { Ionicons } from '@expo/vector-icons'; 
-import { Avatar } from 'react-native-elements';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+} from 'react-native';
+import { Card, Button, Avatar } from 'react-native-elements';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { useTheme } from '../context/ThemeContext'; 
-import { MOBILE_SERVER_URL } from '@env';
+import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
+import { createGlobalStyles } from '../utils/globalStyles';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { authService, apiUtils } from '../services';
 
-export default function ProfileScreen() {
-  const [userData, setUserData] = useState(null);
-  const [loadingProfile, setLoadingProfile] = useState(true); 
+export default function ProfileScreen({ navigation }) {
+  const [userProfile, setUserProfile] = useState(null);
+  const [userStats, setUserStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const { signOut, userToken, userId } = useAuth(); 
-  const navigation = useNavigation();
-  const { theme, toggleTheme } = useTheme(); 
 
-  useEffect(() => {
-    if (userToken && userId) {
-      fetchUserProfile();
-    } else {
-      setLoadingProfile(false); 
-      setError("No active session found. Please log in.");
-    }
-  }, [userToken, userId]);
+  const { signOut } = useAuth();
+  const { theme } = useTheme();
+  const { showSuccess, showInfo } = useToast();
+  const styles = createGlobalStyles(theme);
 
-  const fetchUserProfile = async () => {
-    setLoadingProfile(true);
+  const fetchProfileData = async () => {
+    setLoading(true);
     setError(null);
     try {
-      if (!userToken || !userId) {
-        console.log('ProfileScreen: No user token found, cannot fetch profile.');
-        throw new Error('Authentication token is missing. Please log in again.');
-      }
-      console.log('ProfileScreen: User Token being sent:', userToken);
-      console.log('ProfileScreen: User ID being used:', userId);
-      console.log('ProfileScreen: Fetching user profile...');
-      const response = await fetch(`${MOBILE_SERVER_URL}api/auth/me`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-      });
+      // Fetch profile only (stats API doesn't exist)
+      const profileResponse = await authService.getProfile();
+      const profileResult = apiUtils.parseResponse(profileResponse);
 
-      const data = await response.json();
-      console.log('ProfileScreen: API response received:', data);
-
-      if (response.ok) {
-        setUserData(data.user);
-        console.log('ProfileScreen: User data set:', data.user.username);
-        console.log('ProfileScreen: User id set:', data.user._id);
-      } else {
-        const errorMessage = data.message || 'Failed to fetch user data.';
-        console.error('ProfileScreen: Failed to fetch user data (server error):', errorMessage);
-        throw new Error(errorMessage);
+      if (profileResult.data) {
+        setUserProfile(profileResult.data);
       }
     } catch (err) {
-      console.error('ProfileScreen: Error fetching user profile:', err);
-      setError(err.message || 'An unexpected error occurred while loading profile.');
-      Alert.alert('Profile Error', err.message || 'Could not load profile data.');
+      const errorInfo = apiUtils.handleError(err);
+      setError(errorInfo.message);
     } finally {
-      setLoadingProfile(false);
-      console.log('ProfileScreen: Profile data fetching complete.');
+      setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchProfileData();
   };
 
   const handleLogout = async () => {
-    console.log('--- Logout Button Pressed! ---');
-
-    console.log('User confirmed logout (simulated). Initiating logout process...');
     try {
-      const userToken = await AsyncStorage.getItem('userToken');
-      console.log('Retrieved userToken from AsyncStorage:', userToken ? 'Exists' : 'Does NOT Exist');
-
-      if (userToken) {
-        console.log('Making API call to /api/auth/logout with token...');
-        const response = await fetch(`${MOBILE_SERVER_URL}api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${userToken}`,
-          },
-        });
-
-        const data = await response.json();
-        console.log('API Response Status:', response.status);
-        console.log('API Response Body:', data);
-
-        if (response.ok) {
-          console.log('Server logout successful!');
-          Alert.alert('Success', data.message || 'You have been logged out.');
-        } else {
-          console.error('Server logout failed (non-2xx status):', data.message || 'Unknown server error');
-          Alert.alert('Logout Issue', data.message || 'Server logout failed. You might need to log in again.');
-        }
-      } else {
-        console.warn('No user token found locally to send to server for logout.');
-      }
-
+      await authService.logout();
       await signOut();
-
+      showSuccess('Logged out successfully');
+      // Navigation is handled automatically by AppNavigator
     } catch (error) {
-      console.error('CRITICAL LOGOUT ERROR:', error);
-      Alert.alert('Logout Error', 'Could not connect to the server or an unexpected error occurred. Please try again later.');
-
+      console.error('Logout error:', error);
+      showInfo('Logged out locally');
+      // Still logout locally even if API call fails
       await signOut();
+      // Navigation is handled automatically by AppNavigator
     }
   };
 
-  const handleChangePassword = () => {
-    console.log('Change Password button pressed. Navigating to Change Password screen...');
-    navigation.navigate('Courses');
-  };
-
-  if (loadingProfile) { 
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4CC2FF" />
-        <Text style={styles.loadingText}>Loading profile...</Text>
+  const renderProfileSection = () => (
+    <Card containerStyle={localStyles.profileCard}>
+      <View style={localStyles.profileHeader}>
+        <Avatar
+          size="large"
+          rounded
+          icon={{ name: 'person', type: 'material' }}
+          containerStyle={localStyles.avatar}
+          source={userProfile?.avatar ? { uri: userProfile.avatar } : null}
+        />
+        <View style={localStyles.profileInfo}>
+          <Text style={localStyles.userName}>
+            {userProfile?.name || 'User Name'}
+          </Text>
+          <Text style={localStyles.userEmail}>
+            {userProfile?.email || 'user@example.com'}
+          </Text>
+          <Text style={localStyles.userRole}>
+            {userProfile?.role || 'Student'}
+          </Text>
+        </View>
       </View>
-    );
+    </Card>
+  );
+
+  const renderStatsSection = () => (
+    <Card containerStyle={localStyles.statsCard}>
+      <Card.Title style={localStyles.statsTitle}>Your Progress</Card.Title>
+      <View style={localStyles.statsGrid}>
+        <View style={localStyles.statItem}>
+          <Ionicons name="book-outline" size={24} color="#4CC2FF" />
+          <Text style={localStyles.statNumber}>{userStats?.coursesCompleted || 0}</Text>
+          <Text style={localStyles.statLabel}>Courses</Text>
+        </View>
+        <View style={localStyles.statItem}>
+          <Ionicons name="checkmark-circle-outline" size={24} color="#28a745" />
+          <Text style={localStyles.statNumber}>{userStats?.testsPassed || 0}</Text>
+          <Text style={localStyles.statLabel}>Tests Passed</Text>
+        </View>
+        <View style={localStyles.statItem}>
+          <Ionicons name="trophy-outline" size={24} color="#ffc107" />
+          <Text style={localStyles.statNumber}>{userStats?.achievements || 0}</Text>
+          <Text style={localStyles.statLabel}>Achievements</Text>
+        </View>
+        <View style={localStyles.statItem}>
+          <Ionicons name="time-outline" size={24} color="#ff6b6b" />
+          <Text style={localStyles.statNumber}>{userStats?.studyHours || 0}h</Text>
+          <Text style={localStyles.statLabel}>Study Time</Text>
+        </View>
+      </View>
+    </Card>
+  );
+
+  const renderActionsSection = () => (
+    <Card containerStyle={localStyles.actionsCard}>
+      <Card.Title style={localStyles.actionsTitle}>Account Actions</Card.Title>
+      <View style={localStyles.actionsList}>
+        <TouchableOpacity
+          style={localStyles.actionItem}
+          onPress={() => navigation.navigate('ChangePassword')}
+        >
+          <Ionicons name="lock-closed-outline" size={20} color="#4CC2FF" />
+          <Text style={localStyles.actionText}>Change Password</Text>
+          <Ionicons name="chevron-forward" size={20} color="#888" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={localStyles.actionItem}
+          onPress={() => navigation.navigate('MyCourses')}
+        >
+          <Ionicons name="book-outline" size={20} color="#28a745" />
+          <Text style={localStyles.actionText}>My Courses</Text>
+          <Ionicons name="chevron-forward" size={20} color="#888" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={localStyles.actionItem}
+          onPress={() => navigation.navigate('Achievements')}
+        >
+          <Ionicons name="trophy-outline" size={20} color="#ffc107" />
+          <Text style={localStyles.actionText}>My Achievements</Text>
+          <Ionicons name="chevron-forward" size={20} color="#888" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={localStyles.actionItem}
+          onPress={() => navigation.navigate('Membership')}
+        >
+          <Ionicons name="star-outline" size={20} color="#ff6b6b" />
+          <Text style={localStyles.actionText}>Membership</Text>
+          <Ionicons name="chevron-forward" size={20} color="#888" />
+        </TouchableOpacity>
+      </View>
+    </Card>
+  );
+
+  const renderLogoutSection = () => (
+    <Card containerStyle={localStyles.logoutCard}>
+      <Button
+        title="Logout"
+        buttonStyle={localStyles.logoutButton}
+        titleStyle={localStyles.logoutButtonText}
+        icon={{
+          name: 'log-out-outline',
+          type: 'ionicon',
+          size: 20,
+          color: '#fff',
+        }}
+        onPress={handleLogout}
+      />
+    </Card>
+  );
+
+  if (loading) {
+    return <LoadingSpinner fullScreen text="Loading profile..." />;
   }
 
   if (error) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>Error: {error}</Text>
-        {userToken && (
-          <TouchableOpacity style={styles.retryButton} onPress={fetchUserProfile}>
-            <Text style={styles.retryButtonText}>Tap to Retry</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={[styles.logoutButtonSm, { marginTop: 10 }]} onPress={handleLogout}>
-          <Text style={styles.logoutButtonTextSm}>Logout</Text>
-        </TouchableOpacity>
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={50} color="#ff6b6b" />
+        <Text style={styles.errorText}>{error}</Text>
+        <Button
+          title="Retry"
+          onPress={fetchProfileData}
+          buttonStyle={styles.retryButton}
+          titleStyle={styles.retryButtonText}
+        />
       </View>
     );
   }
-
-  if (!userData) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>No user data available. Please log in.</Text>
-        <TouchableOpacity style={styles.logoutButtonSm} onPress={handleLogout}>
-          <Text style={styles.logoutButtonTextSm}>Login / Logout</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-    } catch (e) {
-      console.warn("Invalid date string for formatting:", dateString);
-      return dateString; 
-    }
-  };
 
   return (
-    <ScrollView style={[styles.container, {backgroundColor: theme.colors.background}]}>
-      <View style={[styles.header, { backgroundColor: theme.colors.cardBackground }]}>
-        {/* <Ionicons name="person-circle-outline" size={80} color="#4CC2FF" /> */}
-        <Avatar
-          size={'large'}
-          rounded
-          source={userData.avatar ? { uri: userData.avatar } : require('../assets/ELS_logo.png')} />
-        <Text style={[styles.username, {color: theme.colors.text}]}>{userData.username || 'N/A'}</Text>
-        <Text style={[styles.email, {color: theme.colors.text}]}>{userData.email || 'N/A'}</Text>
-      </View>
-
-      <View style={styles.infoCard}>
-        <View style={styles.infoRow}>
-          <Ionicons name="mail-outline" size={20} color="#666" style={styles.icon} />
-          <Text style={[styles.label, {color: theme.colors.text}]}>Email:</Text>
-          <Text style={[styles.value, {color: theme.colors.text}]}>{userData.email || 'Not provided'}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="calendar-outline" size={20} color="#666" style={styles.icon} />
-          <Text style={[styles.label, {color: theme.colors.text}]}>Member Since:</Text>
-          <Text style={[styles.value, {color: theme.colors.text}]}>{formatDate(userData.createdAt)}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Ionicons name="trophy-outline" size={20} color="#666" style={styles.icon} />
-          <Text style={[styles.label, {color: theme.colors.text}]}>Online Streak:</Text>
-          <Text style={[styles.value, {color: theme.colors.text}]}>{userData.onlineStreak !== undefined ? `${userData.onlineStreak} days` : 'N/A'}</Text>
-        </View>
-        {userData.role !== undefined && (
-          <View style={styles.infoRow}>
-            <Ionicons name="briefcase-outline" size={20} color="#666" style={styles.icon} />
-            <Text style={[styles.label, {color: theme.colors.text}]}>Role:</Text>
-            <Text style={[styles.value, {color: theme.colors.text}]}>{userData.role === 0 ? 'User' : 'Admin'}</Text>
-          </View>
-        )}
-        {userData.lastOnline && (
-          <View style={styles.infoRow}>
-            <Ionicons name="time-outline" size={20} color="#666" style={styles.icon} />
-            <Text style={[styles.label, {color: theme.colors.text}]}>Last Online:</Text>
-            <Text style={[styles.value, {color: theme.colors.text}]}>{formatDate(userData.lastOnline)}</Text>
-          </View>
-        )}
-      </View>
-
-      <TouchableOpacity onPress={toggleTheme} style={[styles.themeToggleButton, { backgroundColor: theme.colors.cardBackground }]}>
-        <Ionicons name={theme.colors.background === '#000000' ? "sunny-outline" : "moon-outline"} size={24} color={theme.colors.iconColor} />
-        <Text style={[styles.themeToggleButtonText, { color: theme.colors.text }]}>
-          Switch to {theme.colors.background === '#000000' ? 'Light' : 'Dark'} Mode
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.passwordButton} onPress={() => navigation.navigate('ChangePassword')}>
-        <Ionicons name="lock-closed-outline" size={24} color="fff"/>
-        <Text style={styles.passwordText}>Change Password</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={24} color="#fff" />
-        <Text style={styles.logoutButtonText}>Logout</Text>
-      </TouchableOpacity>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContainer}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+      showsVerticalScrollIndicator={false}
+    >
+      {renderProfileSection()}
+      {renderActionsSection()}
+      {renderLogoutSection()}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+const localStyles = StyleSheet.create({
+  profileCard: {
+    borderRadius: 12,
+    margin: 15,
+    backgroundColor: '#2a2a2a',
+    borderColor: '#333',
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
+  profileHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 10,
-    color: '#fff',
-    fontSize: 16,
-  },
-  errorText: {
-    color: '#FF4C4C',
-    fontSize: 18,
-    textAlign: 'center',
-    marginHorizontal: 20,
-  },
-  retryButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  avatar: {
     backgroundColor: '#4CC2FF',
-    borderRadius: 8,
+    marginRight: 15,
   },
-  retryButtonText: {
+  profileInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 20,
+    fontFamily: 'Mulish-Bold',
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginBottom: 5,
   },
-  logoutButtonSm: { 
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#FF4C4C',
-    borderRadius: 8,
+  userEmail: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Regular',
+    color: '#ccc',
+    marginBottom: 3,
   },
-  logoutButtonTextSm: {
+  userRole: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Medium',
+    color: '#4CC2FF',
+  },
+  statsCard: {
+    borderRadius: 12,
+    margin: 15,
+    backgroundColor: '#2a2a2a',
+    borderColor: '#333',
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontFamily: 'Mulish-Bold',
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    textAlign: 'center',
   },
-  header: {
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+  },
+  statItem: {
     alignItems: 'center',
-    paddingVertical: 40,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    marginBottom: 20,
+    marginVertical: 10,
+    minWidth: 80,
   },
-  username: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginTop: 10,
-  },
-  email: {
-    fontSize: 16,
+  statNumber: {
+    fontSize: 20,
+    fontFamily: 'Mulish-Bold',
+    color: '#fff',
     marginTop: 5,
   },
-  infoCard: {
-    borderRadius: 15,
-    marginHorizontal: 20,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+  statLabel: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Regular',
+    color: '#ccc',
+    marginTop: 2,
   },
-  infoRow: {
+  actionsCard: {
+    borderRadius: 12,
+    margin: 15,
+    backgroundColor: '#2a2a2a',
+    borderColor: '#333',
+  },
+  actionsTitle: {
+    fontSize: 18,
+    fontFamily: 'Mulish-Bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  actionsList: {
+    marginTop: 10,
+  },
+  actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
-    borderBottomWidth: 4,
-    borderBottomColor: '#333',
-    paddingBottom: 10,  
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
   },
-  icon: {
-    marginRight: 10,
-  },
-  label: {
+  actionText: {
+    flex: 1,
     fontSize: 16,
-    fontWeight: 'bold',
-    width: 120, 
+    fontFamily: 'Mulish-Medium',
+    color: '#fff',
+    marginLeft: 15,
   },
-  value: {
-    fontSize: 16,
-    flexShrink: 1, 
+  logoutCard: {
+    borderRadius: 12,
+    margin: 15,
+    backgroundColor: '#2a2a2a',
+    borderColor: '#333',
   },
   logoutButton: {
-    flexDirection: 'row',
-    backgroundColor: '#FF4C4C',
-    paddingVertical: 15,
-    borderRadius: 10,
-    marginHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 30,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 8,
+    paddingVertical: 12,
   },
   logoutButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  passwordButton: {
-    flexDirection: 'row',
-    backgroundColor: '#4CC2FF',
-    paddingVertical: 15,
-    borderRadius: 10,
-    marginHorizontal: 20,
-    marginBottom: 15, 
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  passwordText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  }, 
-  themeToggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 10,
-    marginHorizontal: 20,
-    marginBottom: 15, 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  themeToggleButtonText: {
-    marginLeft: 10,
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Mulish-Bold',
+    fontSize: 16,
   },
 });

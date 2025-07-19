@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext'; 
 import RenderHtml from 'react-native-render-html'; 
 import { MOBILE_SERVER_URL } from '@env'; 
+import { useToast } from '../context/ToastContext';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function BlogDetailScreen({ route, navigation }) {
   const { blogId } = route.params;
@@ -16,6 +18,7 @@ export default function BlogDetailScreen({ route, navigation }) {
   const [error, setError] = useState(null);
 
   const { userToken } = useAuth();
+  const { showError } = useToast();
 
   const { width } = useWindowDimensions();
 
@@ -46,12 +49,12 @@ export default function BlogDetailScreen({ route, navigation }) {
       } else {
         const errorMessage = result.message || 'Failed to fetch blog details.';
         setError(errorMessage);
-        Alert.alert('API Error', errorMessage); 
+        showError('API Error', errorMessage); 
       }
     } catch (err) {
       console.error('Network or parsing error:', err);
       setError('Network error. Could not connect to the server.');
-      Alert.alert('Network Error', 'Could not connect to the server. Please check your connection.');
+      showError('Network Error', 'Could not connect to the server. Please check your connection.');
     } finally {
       setLoading(false); 
     }
@@ -73,12 +76,7 @@ export default function BlogDetailScreen({ route, navigation }) {
   };
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text style={styles.loadingText}>Loading blog details...</Text>
-      </View>
-    );
+    return <LoadingSpinner fullScreen text="Loading blog details..." />;
   }
 
   // Show error message if an error occurred during fetch

@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Card, Button, Image } from 'react-native-elements';
 import { MOBILE_SERVER_URL } from '@env';
+import { useToast } from '../context/ToastContext';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const API_BASE_URL = 'http://localhost:4000/api';
 
@@ -19,6 +21,7 @@ const MyCoursesScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { userToken, userId } = useAuth();
+  const { showError } = useToast();
 
   useEffect(() => {
     const fetchMyCourses = async () => {
@@ -81,7 +84,7 @@ const MyCoursesScreen = ({ navigation }) => {
       } catch (err) {
         console.error('Error in fetchMyCourses:', err.message);
         setError(err.message);
-        Alert.alert('Error', err.message);
+        showError('Error', err.message);
       } finally {
         console.log('FetchMyCourses completed, loading set to false');
         setLoading(false);
@@ -115,12 +118,7 @@ const MyCoursesScreen = ({ navigation }) => {
   );
 
   if (loading) {
-    console.log('Rendering loading state');
-    return (
-      <View style={myCourseStyles.loaderContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
-      </View>
-    );
+    return <LoadingSpinner fullScreen text="Loading my courses..." />;
   }
 
   if (error) {

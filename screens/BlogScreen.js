@@ -1,483 +1,562 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  ActivityIndicator,
   StyleSheet,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
   TextInput,
-  TouchableOpacity, 
+  Animated,
+  Dimensions,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import TopBar from '../components/Topbar'
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Image } from 'react-native-elements';
-import { MOBILE_SERVER_URL } from '@env'; 
+import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
+import { createGlobalStyles } from '../utils/globalStyles';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { blogService, apiUtils } from '../services';
 
-const stripHtmlTags = (htmlString) => {
-  return htmlString ? htmlString.replace(/<[^>]*>/g, '').trim() : '';
-};
+const { width } = Dimensions.get('window');
 
-const BlogItem = ({ blog, navigation }) => {
-  const plainTextContent = stripHtmlTags(blog.content);
+const BlogCard = ({ blog, navigation, theme, index }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'published':
+        return theme.colors.primary;
+      case 'draft':
+      case 'drafting':
+        return theme.colors.textMuted;
+      case 'archived':
+        return theme.colors.error;
+      default:
+        return theme.colors.textSecondary;
+    }
+  };
+
   return (
-    <Card containerStyle={blogItemStyles.card}>
-      {blog.coverImage ? (
-        <Card.Image
-          source={{ uri: blog.coverImage }}
-          style={blogItemStyles.image}
-          resizeMode='cover'
-          onError={(e) => console.log('Image loading error:', e.nativeEvent.error)}
-        />
-      ) : (
-        <View style={blogItemStyles.placeholderImage}>
-          <Text style={blogItemStyles.placeholderText}>No Image</Text>
+    <Animated.View
+      style={[
+        styles.blogCard,
+        {
+          backgroundColor: theme.colors.cardBackground,
+          borderColor: theme.colors.borderColor,
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={() => navigation.navigate('BlogDetail', { blogId: blog._id })}
+        activeOpacity={0.8}
+        style={styles.cardTouchable}
+      >
+        {/* Cover Image or Placeholder */}
+        <View style={styles.imageContainer}>
+          {blog.coverImage ? (
+            <Image
+              source={{ uri: blog.coverImage }}
+              style={styles.coverImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.surfaceBackground }]}>
+              <Text style={[styles.imagePlaceholderText, { color: theme.colors.primary }]}>
+                {blog.title?.charAt(0)?.toUpperCase() || 'B'}
+              </Text>
+            </View>
+          )}
+          
+          {/* Status Badge */}
+          {blog.status && (
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(blog.status) + '20' }]}>
+              <Text style={[styles.statusText, { color: getStatusColor(blog.status) }]}>
+                {blog.status.toUpperCase()}
+              </Text>
+            </View>
+          )}
         </View>
-      )}
-      <Card.Title style={blogItemStyles.title}>{blog.title}</Card.Title>
-      <Text style={blogItemStyles.contentSnippet} numberOfLines={3}>
-        {plainTextContent}
-      </Text>
-      <Text style={blogItemStyles.date}>
-        Published: {new Date(blog.createdAt).toLocaleDateString()}
-      </Text>
-      <Button
-        title="Read More"
-        buttonStyle={blogItemStyles.readMoreButton}
-        titleStyle={blogItemStyles.readMoreButtonText}
-        onPress={() => navigation.navigate('BlogDetail', { blogId: blog._id })} 
-        type="solid"
-      />
-    </Card>
+
+        {/* Content */}
+        <View style={styles.cardContent}>
+          {/* Title */}
+          <Text
+            style={[styles.blogTitle, { color: theme.colors.text }]}
+            numberOfLines={2}
+          >
+            {blog.title}
+          </Text>
+
+          {/* Content Preview */}
+          <Text
+            style={[styles.contentPreview, { color: theme.colors.textSecondary }]}
+            numberOfLines={3}
+          >
+            {blog.content?.replace(/<[^>]*>/g, '').substring(0, 120)}...
+          </Text>
+
+          {/* Meta Information */}
+          <View style={styles.blogMeta}>
+            <View style={styles.authorInfo}>
+              <Ionicons name="person-outline" size={14} color={theme.colors.textMuted} />
+              <Text style={[styles.authorText, { color: theme.colors.textMuted }]}>
+                {blog.user?.username || 'Anonymous'}
+              </Text>
+            </View>
+            
+            <View style={styles.dateInfo}>
+              <Ionicons name="calendar-outline" size={14} color={theme.colors.textMuted} />
+              <Text style={[styles.dateText, { color: theme.colors.textMuted }]}>
+                {formatDate(blog.createdAt)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Stats */}
+          <View style={styles.blogStats}>
+            <View style={styles.statItem}>
+              <Ionicons name="eye-outline" size={16} color={theme.colors.textMuted} />
+              <Text style={[styles.statText, { color: theme.colors.textMuted }]}>
+                {blog.views || 0}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="heart-outline" size={16} color={theme.colors.textMuted} />
+              <Text style={[styles.statText, { color: theme.colors.textMuted }]}>
+                {blog.likes || 0}
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="chatbubble-outline" size={16} color={theme.colors.textMuted} />
+              <Text style={[styles.statText, { color: theme.colors.textMuted }]}>
+                {blog.comments?.length || 0}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Read More Arrow */}
+        <View style={styles.readMoreContainer}>
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
-const blogItemStyles = StyleSheet.create({
-  card: {
-    borderRadius: 12,
-    marginVertical: 10,
-    marginHorizontal: 15,
-    padding: 0,
-    overflow: 'hidden',
-    backgroundColor: '#2a2a2a',
-    borderColor: '#333', 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  image: {
-    width: '100%',
-    height: 180,
-  },
-  placeholderImage: {
-    width: '100%',
-    height: 180,
-    backgroundColor: '#444', 
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    color: '#bbb', 
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    marginTop: 15,
-    paddingHorizontal: 15,
-    textAlign: 'left',
-    color: '#fff', 
-  },
-  contentSnippet: {
-    fontSize: 14,
-    color: '#ccc', 
-    lineHeight: 20,
-    marginBottom: 10,
-    paddingHorizontal: 15,
-  },
-  date: {
-    fontSize: 12,
-    color: '#aaa', 
-    textAlign: 'right',
-    paddingHorizontal: 15,
-    marginBottom: 10,
-  },
-  readMoreButton: {
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    marginHorizontal: 15,
-    marginBottom: 15,
-    marginTop: 5,
-  },
-  readMoreButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-});
+const SearchHeader = ({ searchQuery, setSearchQuery, onSearch, onReset, theme }) => {
+  const globalStyles = createGlobalStyles(theme);
+  
+  return (
+    <View style={[styles.searchContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
+      <View style={styles.searchInputContainer}>
+        <Ionicons name="search" size={20} color={theme.colors.textMuted} style={styles.searchIcon} />
+        <TextInput
+          style={[styles.searchInput, { color: theme.colors.text }]}
+          placeholder="Search blogs..."
+          placeholderTextColor={theme.colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={onSearch}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={onReset} style={styles.clearButton}>
+            <Ionicons name="close-circle" size={20} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+};
 
-export default function BlogScreen({navigation}) {
+export default function BlogScreen() {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [size, setSize] = useState(5);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const [order, setOrder] = useState('desc');
-  const [sortBy, setSortBy] = useState('date');
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const navigation = useNavigation();
+  const { userToken } = useAuth();
+  const { theme } = useTheme();
+  const { showError } = useToast();
+  const globalStyles = createGlobalStyles(theme);
 
-  const { userToken } = useAuth(); 
+  const headerAnim = useRef(new Animated.Value(0)).current;
 
+  // Debounce search
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(search);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
     }, 500);
 
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [search]);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  const fetchBlogs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const queryParams = new URLSearchParams({
-        page: page.toString(),
-        size: size.toString(),
-        order: order,
-        sortBy: sortBy,
-      });
-
-      if (debouncedSearch) {
-        queryParams.append('search', debouncedSearch);
-      }
-
-      const url = `${MOBILE_SERVER_URL}api/blogs?${queryParams.toString()}`;
-      console.log('Fetching from URL:', url);
-
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${userToken}`,
-        },
-      });
-
-      const result = await response.json();
-      console.log('API Response:', result);
-
-      if (response.ok) {
-        const blogsData = result.data || result.blogs;
-        if (blogsData && Array.isArray(blogsData)) {
-          setBlogs(blogsData);
-          setTotal(result.total || 0);
-          setTotalPages(result.totalPages || 0);
-        } else {
-          setBlogs([]);
-          setTotal(0);
-          setTotalPages(0);
-          Alert.alert('Data Error', result.message || 'Received unexpected data structure. Missing "data" or "blogs" array.');
-        }
-      } else {
-        setError(result.message || 'Failed to fetch blogs.');
-        Alert.alert('API Error', result.message || 'Failed to fetch blogs.');
-        setBlogs([]);
-      }
-    } catch (err) {
-      console.error('Network or parsing error:', err);
-      setError('Network error. Could not connect to the server.');
-      Alert.alert('Network Error', 'Could not connect to the server. Please check your connection.');
-      setBlogs([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, size, order, sortBy, debouncedSearch, userToken]);
+  // Fetch blogs when search changes
+  useEffect(() => {
+    setPage(1);
+    fetchBlogs(true);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     fetchBlogs();
-  }, [fetchBlogs]);
+    
+    // Animate header
+    Animated.timing(headerAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
-  const handleNextPage = () => {
-    if (page < totalPages) {
-      setPage(prevPage => prevPage + 1);
+  const fetchBlogs = useCallback(async (resetPage = false) => {
+    if (resetPage) {
+      setLoading(true);
     }
+    setError(null);
+    
+    try {
+      const currentPage = resetPage ? 1 : page;
+      const params = {
+        page: currentPage,
+        size: 10,
+        order: 'desc',
+        sortBy: 'date',
+        ...(debouncedSearch && { search: debouncedSearch }),
+      };
+
+      const response = await blogService.getBlogs(params);
+      const result = apiUtils.parseResponse(response);
+
+      if (result.data && Array.isArray(result.data)) {
+        setBlogs(result.data);
+        setTotal(result.total || 0);
+        setTotalPages(result.totalPages || 0);
+      } else {
+        setBlogs([]);
+      }
+    } catch (error) {
+      console.error('Error fetching blogs:', error);
+      const errorInfo = apiUtils.handleError(error);
+      setError(errorInfo.message);
+      showError('Failed to load blogs');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [page, debouncedSearch]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    setPage(1);
+    fetchBlogs(true);
   };
 
-  const handlePreviousPage = () => {
-    if (page > 1) {
-      setPage(prevPage => prevPage - 1);
-    }
+  const handleSearch = () => {
+    setPage(1);
+    fetchBlogs(true);
   };
 
-  const renderFooter = () => (
-    <View style={styles.paginationContainer}>
-      <Button
-        icon={<Ionicons name="arrow-back" size={20} color={page === 1 || loading ? 'gray' : '#fff'} />}
-        title="Previous"
-        type="clear"
-        titleStyle={[styles.paginationButtonText, page === 1 || loading ? { color: 'gray' } : {color: '#fff'}]}
-        disabled={page === 1 || loading}
-        onPress={handlePreviousPage}
-        buttonStyle={styles.paginationButton}
+  const handleReset = () => {
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setPage(1);
+  };
+
+  const renderBlogItem = ({ item, index }) => (
+    <BlogCard
+      blog={item}
+      navigation={navigation}
+      theme={theme}
+      index={index}
+    />
+  );
+
+  const renderHeader = () => (
+    <View>
+      {/* Title Header */}
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            opacity: headerAnim,
+            transform: [
+              {
+                translateY: headerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Text style={[globalStyles.title, { color: theme.colors.text }]}>
+          Blog & Articles
+        </Text>
+        <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
+          Discover insights and tips for your English learning journey
+        </Text>
+      </Animated.View>
+
+      {/* Search Header */}
+      <SearchHeader
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        onSearch={handleSearch}
+        onReset={handleReset}
+        theme={theme}
       />
-      <Text style={styles.pageInfo}>
-        Page {page} of {totalPages}
-      </Text>
-      <Button
-        iconRight
-        icon={<Ionicons name="arrow-forward" size={20} color={page === totalPages || loading ? 'gray' : '#fff'} />}
-        title="Next"
-        type="clear"
-        titleStyle={[styles.paginationButtonText, page === totalPages || loading ? { color: 'gray' } : {color: '#fff'}]}
-        disabled={page === totalPages || loading}
-        onPress={handleNextPage}
-        buttonStyle={styles.paginationButton}
-      />
+
+      {/* Results Info */}
+      {!loading && (
+        <View style={styles.resultsInfo}>
+          <Text style={[styles.resultsText, { color: theme.colors.textSecondary }]}>
+            {searchQuery
+              ? `Found ${total} result${total !== 1 ? 's' : ''} for "${searchQuery}"`
+              : `${total} article${total !== 1 ? 's' : ''} available`}
+          </Text>
+        </View>
+      )}
     </View>
   );
 
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="document-text-outline" size={64} color={theme.colors.textMuted} />
+      <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 16 }]}>
+        {searchQuery ? 'No blogs found matching your search.' : 'No blogs available at the moment.'}
+      </Text>
+      {searchQuery && (
+        <TouchableOpacity
+          style={[globalStyles.buttonOutline, styles.clearSearchButton]}
+          onPress={handleReset}
+        >
+          <Text style={globalStyles.buttonOutlineText}>Clear Search</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  if (loading && !refreshing) {
+    return <LoadingSpinner fullScreen text="Loading blogs..." />;
+  }
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-    >
-      <View style={styles.container}>
-        <TopBar title="Blog" />
-        <View style={styles.controlsContainer}>
-          <View style={styles.searchInputWrapper}>
-            <Ionicons name="search-outline" size={20} color="#888" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search blogs by title/content..."
-              value={search}
-              onChangeText={setSearch}
-              placeholderTextColor="#888"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={true} 
-              keyboardAppearance="dark" 
-            />
-          </View>
-
-          {/* <View style={styles.sortFilterSection}>
-            <View style={styles.filterRow}>
-              <Text style={styles.label}>Sort By:</Text>
-              <Button
-                title="Date"
-                type={sortBy === 'date' ? 'solid' : 'outline'}
-                buttonStyle={[styles.sortButton, sortBy === 'date' && styles.activeSortButton]}
-                titleStyle={[styles.sortButtonText, sortBy === 'date' && styles.activeSortButtonText]}
-                onPress={() => { setSortBy('date'); setPage(1); }}
-              />
-              <Button
-                title="Title"
-                type={sortBy === 'title' ? 'solid' : 'outline'}
-                buttonStyle={[styles.sortButton, sortBy === 'title' && styles.activeSortButton]}
-                titleStyle={[styles.sortButtonText, sortBy === 'title' && styles.activeSortButtonText]}
-                onPress={() => { setSortBy('title'); setPage(1); }}
-              />
-            </View>
-
-            <View style={styles.filterRow}>
-              <Text style={styles.label}>Order:</Text>
-              <Button
-                title="ASC"
-                type={order === 'asc' ? 'solid' : 'outline'}
-                buttonStyle={[styles.sortButton, order === 'asc' && styles.activeSortButton]}
-                titleStyle={[styles.sortButtonText, order === 'asc' && styles.activeSortButtonText]}
-                onPress={() => { setOrder('asc'); setPage(1); }}
-              />
-              <Button
-                title="DESC"
-                type={order === 'desc' ? 'solid' : 'outline'}
-                buttonStyle={[styles.sortButton, order === 'desc' && styles.activeSortButton]}
-                titleStyle={[styles.sortButtonText, order === 'desc' && styles.activeSortButtonText]}
-                onPress={() => { setOrder('desc'); setPage(1); }}
-              />
-            </View>
-          </View> */}
-        </View>
-
-        {loading && blogs.length === 0 ? (
-          <ActivityIndicator size="large" color="#007bff" style={styles.loader} />
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={30} color="red" />
-            <Text style={styles.errorText}>{error}</Text>
-            <Button
-              title="Retry"
-              onPress={fetchBlogs}
-              buttonStyle={styles.retryButton}
-              titleStyle={styles.retryButtonText}
-            />
-          </View>
-        ) : blogs.length === 0 ? (
-          <View style={styles.noBlogsContainer}>
-            <Ionicons name="ios-information-circle-outline" size={50} color="#888" />
-            <Text style={styles.noBlogsText}>No blogs found.</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={blogs}
-            keyExtractor={(item) => item._id}
-            renderItem={({ item }) => <BlogItem blog={item} navigation={navigation}/>}
-            contentContainerStyle={styles.listContentContainer}
-            ListFooterComponent={totalPages > 1 ? renderFooter : null}
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <FlatList
+        data={blogs}
+        renderItem={renderBlogItem}
+        keyExtractor={(item) => item._id}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
           />
-        )}
-      </View>
-    </KeyboardAvoidingView>
+        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.flatListContent}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff', 
-  },
-  controlsContainer: {
-    padding: 15,
-    backgroundColor: '#1a1a1a', 
-  },
-  searchInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#444',
-    borderRadius: 8,
-    backgroundColor: 'fff',
-    marginBottom: 15,
-    height: 45,
-    paddingHorizontal: 10,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1, 
-    fontSize: 16,
-    color: '#eee', 
-    paddingVertical: Platform.OS === 'web' ? 8 : 0, 
-    outlineStyle: 'none', 
-  },
-  sortFilterSection: {
-    flexDirection: 'column',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 14,
-    marginRight: 8,
-    fontWeight: '600',
-    color: '#bbb', 
-  },
-  sortButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
-    minWidth: 80,
-    borderColor: '#555',
-  },
-  activeSortButton: {
     backgroundColor: '#fff',
   },
-  sortButtonText: {
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  activeSortButtonText: {
-    color: '#000',
-  },
-  listContentContainer: {
+  flatListContent: {
     paddingBottom: 20,
   },
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
+  header: {
     alignItems: 'center',
-    color: '#007bff',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    color: '#ff6b6b',
-    marginTop: 10,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#007bff',
-    paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 8,
-    marginTop: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  noBlogsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  noBlogsText: {
-    fontSize: 18,
-    color: '#aaa',
-    marginTop: 10,
-  },
-  paginationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#333',
-    backgroundColor: '#1a1a1a',
-    marginTop: 10,
+  searchContainer: {
+    marginHorizontal: 16,
+    marginVertical: 16,
     borderRadius: 12,
-    marginHorizontal: 15,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Mulish-Regular',
+  },
+  clearButton: {
+    padding: 4,
+  },
+  resultsInfo: {
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  resultsText: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Medium',
+  },
+  blogCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  paginationButton: {
-    // RNE Buttons have padding by default, adjust as needed
+  cardTouchable: {
+    flexDirection: 'row',
   },
-  paginationButtonText: {
+  imageContainer: {
+    width: 120,
+    height: 140,
+    position: 'relative',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imagePlaceholderText: {
+    fontSize: 32,
+    fontFamily: 'Mulish-Bold',
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 10,
+    fontFamily: 'Mulish-Bold',
+  },
+  cardContent: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+  },
+  blogTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: 'Mulish-Bold',
+    lineHeight: 22,
+    marginBottom: 8,
   },
-  pageInfo: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#bbb',
+  contentPreview: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Regular',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  blogMeta: {
+    marginBottom: 12,
+  },
+  authorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  authorText: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Medium',
+    marginLeft: 4,
+  },
+  dateInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dateText: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Regular',
+    marginLeft: 4,
+  },
+  blogStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  statText: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Medium',
+    marginLeft: 4,
+  },
+  readMoreContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingRight: 16,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  clearSearchButton: {
+    marginTop: 16,
   },
 });
