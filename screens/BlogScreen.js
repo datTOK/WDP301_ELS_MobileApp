@@ -196,6 +196,15 @@ const SearchHeader = ({ searchQuery, setSearchQuery, onSearch, onReset, theme })
           </TouchableOpacity>
         )}
       </View>
+      <TouchableOpacity
+        style={[styles.searchButton, { backgroundColor: theme.colors.primary }]}
+        onPress={onSearch}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.searchButtonText, { color: theme.colors.buttonText }]}>
+          Search
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -206,7 +215,7 @@ export default function BlogScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [currentSearch, setCurrentSearch] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -219,23 +228,9 @@ export default function BlogScreen() {
 
   const headerAnim = useRef(new Animated.Value(0)).current;
 
-  // Debounce search
+  // Fetch blogs when component mounts
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Fetch blogs when search changes
-  useEffect(() => {
-    setPage(1);
-    fetchBlogs(true);
-  }, [debouncedSearch]);
-
-  useEffect(() => {
-    fetchBlogs();
+    fetchBlogs(false, '');
     
     // Animate header
     Animated.timing(headerAnim, {
@@ -245,7 +240,7 @@ export default function BlogScreen() {
     }).start();
   }, []);
 
-  const fetchBlogs = useCallback(async (resetPage = false) => {
+  const fetchBlogs = useCallback(async (resetPage = false, searchTerm = null) => {
     if (resetPage) {
       setLoading(true);
     }
@@ -253,12 +248,13 @@ export default function BlogScreen() {
     
     try {
       const currentPage = resetPage ? 1 : page;
+      const searchToUse = searchTerm !== null ? searchTerm : currentSearch;
       const params = {
         page: currentPage,
         size: 10,
         order: 'desc',
         sortBy: 'date',
-        ...(debouncedSearch && { search: debouncedSearch }),
+        ...(searchToUse && { search: searchToUse }),
       };
 
       const response = await blogService.getBlogs(params);
@@ -280,23 +276,25 @@ export default function BlogScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [page, debouncedSearch]);
+  }, [page]);
 
   const onRefresh = () => {
     setRefreshing(true);
     setPage(1);
-    fetchBlogs(true);
+    fetchBlogs(true, currentSearch);
   };
 
   const handleSearch = () => {
+    setCurrentSearch(searchQuery);
     setPage(1);
-    fetchBlogs(true);
+    fetchBlogs(true, searchQuery);
   };
 
   const handleReset = () => {
     setSearchQuery('');
-    setDebouncedSearch('');
+    setCurrentSearch('');
     setPage(1);
+    fetchBlogs(true, '');
   };
 
   const renderBlogItem = ({ item, index }) => (
@@ -348,8 +346,8 @@ export default function BlogScreen() {
       {!loading && (
         <View style={styles.resultsInfo}>
           <Text style={[styles.resultsText, { color: theme.colors.textSecondary }]}>
-            {searchQuery
-              ? `Found ${total} result${total !== 1 ? 's' : ''} for "${searchQuery}"`
+            {currentSearch
+              ? `Found ${total} result${total !== 1 ? 's' : ''} for "${currentSearch}"`
               : `${total} article${total !== 1 ? 's' : ''} available`}
           </Text>
         </View>
@@ -361,9 +359,9 @@ export default function BlogScreen() {
     <View style={styles.emptyContainer}>
       <Ionicons name="document-text-outline" size={64} color={theme.colors.textMuted} />
       <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 16 }]}>
-        {searchQuery ? 'No blogs found matching your search.' : 'No blogs available at the moment.'}
+        {currentSearch ? 'No blogs found matching your search.' : 'No blogs available at the moment.'}
       </Text>
-      {searchQuery && (
+      {currentSearch && (
         <TouchableOpacity
           style={[globalStyles.buttonOutline, styles.clearSearchButton]}
           onPress={handleReset}
@@ -421,10 +419,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: 8,
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -438,6 +441,17 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: 4,
+  },
+  searchButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchButtonText: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
   },
   resultsInfo: {
     paddingHorizontal: 20,

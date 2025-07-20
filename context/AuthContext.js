@@ -7,18 +7,18 @@ export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);
-  const [userId, setUserId] = useState(null);
+  const [user, setUser] = useState(null);
 
   const fetchAndSetUserProfile = useCallback(async (token) => {
     try {
       console.log('AuthContext: Fetching user profile...');
       const result = await authService.getUserProfile(token);
 
-      if (result.success && result.userId) {
-        console.log('AuthContext: User profile fetched. User ID:', result.userId);
-        await SecureStorage.setUserData(SECURE_KEYS.USER_ID, result.userId);
-        setUserId(result.userId);
-        return result.userId; 
+      if (result.success && result.user) {
+        console.log('AuthContext: User profile fetched. User ID:', result.user._id);
+        await SecureStorage.setUserData(SECURE_KEYS.USER_PROFILE, JSON.stringify(result.user));
+        setUser(result.user);
+        return result.user; 
       } else {
         console.error('AuthContext: Failed to fetch user profile:', result.error);
         throw new Error(result.error || 'Failed to get user profile.');
@@ -36,29 +36,35 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(true);
       try {
         const token = await SecureStorage.getToken();
-        const storedUserId = await SecureStorage.getUserData(SECURE_KEYS.USER_ID);
+        const storedUserProfile = await SecureStorage.getUserData(SECURE_KEYS.USER_PROFILE);
         
         console.log('AuthContext: Token found:', !!token);
-        console.log('AuthContext: User ID found:', !!storedUserId);
+        console.log('AuthContext: User profile found:', !!storedUserProfile);
         
         setUserToken(token);
-        if (token && !storedUserId) {
-          console.log('AuthContext: Token found but no UserId. Fetching profile...');
-          try {
-            await fetchAndSetUserProfile(token);
-          } catch (profileError) {
-            console.warn('AuthContext: Failed to fetch profile during auth check, but keeping token:', profileError);
-            // Keep the token, profile can be fetched later
+        if (token) {
+          if (storedUserProfile) {
+            // Use stored profile data
+            const userData = JSON.parse(storedUserProfile);
+            setUser(userData);
+            console.log('AuthContext: Using stored user profile');
+          } else {
+            // Fetch fresh profile data
+            console.log('AuthContext: No stored profile, fetching fresh data...');
+            try {
+              await fetchAndSetUserProfile(token);
+            } catch (profileError) {
+              console.warn('AuthContext: Failed to fetch profile during auth check, but keeping token:', profileError);
+              // Keep the token, profile can be fetched later
+            }
           }
-        } else {
-          setUserId(storedUserId);
         }
       } catch (error) {
         console.error('AuthContext: Failed to retrieve user token:', error);
         await SecureStorage.removeToken();
-        await SecureStorage.removeUserData(SECURE_KEYS.USER_ID);
+        await SecureStorage.removeUserData(SECURE_KEYS.USER_PROFILE);
         setUserToken(null);
-        setUserId(null);
+        setUser(null);
       } finally {
         setIsLoading(false);
         console.log('AuthContext: Authentication check complete.');
@@ -70,13 +76,13 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     console.log('AuthContext: userToken state:', userToken ? 'LOGGED_IN' : 'LOGGED_OUT');
-    console.log('AuthContext: userId state:', userId || 'NULL');
-  }, [userToken, userId]);
+    console.log('AuthContext: user state:', user ? 'LOADED' : 'NULL');
+  }, [userToken, user]);
 
   const authContext = useMemo(
     () => ({
       userToken,
-      userId,
+      user,
       isLoading,
       fetchAndSetUserProfile,
 
@@ -118,9 +124,9 @@ export const AuthProvider = ({ children }) => {
           
           // Clear storage
           await SecureStorage.removeToken();
-          await SecureStorage.removeUserData(SECURE_KEYS.USER_ID);
+          await SecureStorage.removeUserData(SECURE_KEYS.USER_PROFILE);
           setUserToken(null);
-          setUserId(null);
+          setUser(null);
           console.log('AuthContext: SignOut complete.');
         } catch (error) {
           console.error('AuthContext: Error during signOut:', error);
@@ -141,7 +147,7 @@ export const AuthProvider = ({ children }) => {
         }
       },
     }),
-    [userToken, isLoading, userId, fetchAndSetUserProfile] 
+    [userToken, isLoading, user, fetchAndSetUserProfile] 
   );
 
   return (

@@ -18,13 +18,12 @@ const TestScreenDetail = ({ route, navigation }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [justSubmitted, setJustSubmitted] = useState(false);
-  const { userToken } = useAuth();
+  const { userToken, user } = useAuth();
   const { showError } = useToast();
 
   const fetchUserId = async () => {
     try {
-      // This would typically come from user context or auth
-      return 'user123'; // Placeholder
+      return user?._id || null;
     } catch (error) {
       console.error('Error fetching user ID:', error);
       return null;

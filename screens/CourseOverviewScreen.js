@@ -18,7 +18,7 @@ import { courseService, userLessonService, apiUtils } from "../services";
 const CourseOverviewScreen = ({ route, navigation }) => {
     const { showError, showSuccess, showWarning } = useToast();
   const { courseId } = route.params;
-  const { userToken, userId } = useAuth();
+  const { userToken, user } = useAuth();
   const [courseInfo, setCourseInfo] = useState({
     title: "",
     description: "",
@@ -36,10 +36,10 @@ const CourseOverviewScreen = ({ route, navigation }) => {
 
   const initialize = async () => {
     try {
-      if (!userId) {
-        setError("User ID not found");
-        return;
-      }
+          if (!user?._id) {
+      setError("User ID not found");
+      return;
+    }
       await fetchData();
     } catch (err) {
       setError(err.message);
@@ -71,7 +71,7 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     }
   };
   const fetchData = useCallback(async () => {
-    if (!userId) {
+    if (!user?._id) {
       return;
     }
     setLoading(true);
@@ -166,31 +166,31 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [courseId, userToken, userId]);
+  }, [courseId, userToken, user?._id]);
 
   useEffect(() => {
-    if (userId) {
+    if (user?._id) {
       fetchData();
     }
-  }, [fetchData, userId]);
+  }, [fetchData, user?._id]);
 
   // Refresh data when screen comes into focus (e.g., when returning from lesson completion)
   useFocusEffect(
     useCallback(() => {
-      if (userId && isEnrolled) {
+      if (user?._id && isEnrolled) {
         fetchData();
       }
-    }, [userId, isEnrolled])
+    }, [user?._id, isEnrolled])
   );
 
     const enrollInCourse = async () => {
-        if (!userId) {
+        if (!user?._id) {
             showError('Error', 'User ID is required to enroll.');
             return;
         }
         setEnrollLoading(true);
         try {
-            const response = await courseService.enrollCourse({ courseId, userId });
+            const response = await courseService.enrollCourse({ courseId, userId: user._id });
             const result = apiUtils.parseResponse(response);
             if (result.data) {
                 setIsEnrolled(true);

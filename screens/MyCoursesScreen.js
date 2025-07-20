@@ -3,96 +3,79 @@ import {
   View,
   Text,
   FlatList,
-  ActivityIndicator,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { Card, Button, Image } from 'react-native-elements';
-import { MOBILE_SERVER_URL } from '@env';
+import { Card, Button } from 'react-native-elements';
 import { useToast } from '../context/ToastContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { courseService, apiUtils } from '../services';
 
-const API_BASE_URL = 'http://localhost:4000/api';
+
 
 const MyCoursesScreen = ({ navigation }) => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { userToken, userId } = useAuth();
+  const { user } = useAuth();
   const { showError } = useToast();
 
   useEffect(() => {
     const fetchMyCourses = async () => {
+      if (!user?._id) {
+        setError('User not authenticated');
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
-      console.log('Starting fetchMyCourses with userId:', userId, 'userToken:', userToken);
-
+      
       try {
-        const response = await fetch(`${MOBILE_SERVER_URL}api/user-courses`, {
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${userToken}`,
-          },
+        // Fetch user courses using the correct API endpoint
+        const response = await courseService.getUserCourses(user._id, {
+          page: 1,
+          size: 50
         });
-        console.log('Fetch response status:', response.status);
+        
+        const result = apiUtils.parseResponse(response);
+        console.log('User courses response:', result);
 
-        if (!response.ok) {
-          console.log('API response not OK, status:', response.status);
-          const errorResult = await response.json();
-          console.log('API error response:', errorResult);
-          throw new Error(errorResult.message || 'Failed to fetch enrolled courses');
+        if (result.data && Array.isArray(result.data)) {
+          // Fetch course details for each enrolled course
+          const courseDetails = await Promise.all(
+            result.data.map(async (userCourse) => {
+              try {
+                const courseResponse = await courseService.getCourseById(userCourse.courseId);
+                const courseResult = apiUtils.parseResponse(courseResponse);
+                return courseResult.data ? { ...courseResult.data, userCourse } : null;
+              } catch (courseError) {
+                console.error('Error fetching course details for courseId:', userCourse.courseId, courseError);
+                return null;
+              }
+            })
+          );
+
+          const validCourses = courseDetails.filter(course => course !== null);
+          console.log('Processed course details:', validCourses);
+          setCourses(validCourses);
+        } else {
+          setCourses([]);
         }
-
-        const result = await response.json();
-        console.log('API response data:', result);
-
-        if (!result.data || !Array.isArray(result.data)) {
-          console.log('Invalid data structure in response:', result);
-          throw new Error('Invalid data structure. Missing "data" array.');
-        }
-
-        const enrolledCourses = result.data || [];
-        console.log('Enrolled courses retrieved:', enrolledCourses);
-
-        const courseDetails = await Promise.all(
-          enrolledCourses.map(async (userCourse) => {
-            console.log('Fetching course details for courseId:', userCourse.courseId);
-            const courseResponse = await fetch(`${MOBILE_SERVER_URL}api/courses/${userCourse.courseId}`, {
-              headers: {
-                'Accept': 'application/json',
-                'Authorization': `Bearer ${userToken}`,
-              },
-            });
-
-            if (!courseResponse.ok) {
-              console.log('Course details fetch failed for courseId:', userCourse.courseId, 'status:', courseResponse.status);
-              return null;
-            }
-
-            const courseData = await courseResponse.json();
-            console.log('Course details fetched for courseId:', userCourse.courseId, 'data:', courseData);
-            return courseResponse.ok ? { ...courseData, userCourse } : null;
-          })
-        );
-
-        const validCourses = courseDetails.filter(course => course !== null);
-        console.log('Processed course details:', validCourses);
-        setCourses(validCourses);
 
       } catch (err) {
-        console.error('Error in fetchMyCourses:', err.message);
-        setError(err.message);
-        showError('Error', err.message);
+        console.error('Error in fetchMyCourses:', err);
+        const errorInfo = apiUtils.handleError(err);
+        setError(errorInfo.message);
+        showError('Failed to load your courses');
       } finally {
-        console.log('FetchMyCourses completed, loading set to false');
         setLoading(false);
       }
     };
 
     fetchMyCourses();
-  }, [userId, userToken]);
+  }, [user?._id]);
 
   const renderCourseItem = ({ item }) => (
     <Card containerStyle={myCourseStyles.card}>
@@ -129,7 +112,10 @@ const MyCoursesScreen = ({ navigation }) => {
         <Text style={myCourseStyles.errorText}>{error}</Text>
         <Button
           title="Retry"
-          onPress={() => fetchMyCourses()}
+          onPress={() => {
+            setError(null);
+            fetchMyCourses();
+          }}
           buttonStyle={myCourseStyles.retryButton}
           titleStyle={myCourseStyles.retryButtonText}
         />

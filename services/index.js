@@ -18,4 +18,7 @@ export { default as userAchievementService } from './userAchievementService';
 export { default as lessonService } from './lessonService';
 export { default as userLessonService } from './userLessonService';
 export { default as userExerciseService } from './userExerciseService';
-export { default as membershipService } from './membershipService'; 
+export { default as membershipService } from './membershipService';
+export { default as flashcardService } from './flashcardService';
+// flashcardSetService is the same as flashcardService for mobile app
+export { default as flashcardSetService } from './flashcardService'; 

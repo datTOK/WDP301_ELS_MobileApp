@@ -50,24 +50,16 @@ const CustomToast = ({
   };
   
   const currentTheme = hasTheme ? theme : fallbackTheme;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(-100)).current;
 
   useEffect(() => {
     if (visible) {
-      // Slide in and fade in
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Slide in
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
 
       // Auto hide after duration
       if (duration > 0) {
@@ -83,26 +75,17 @@ const CustomToast = ({
   }, [visible, duration]);
 
   const hideToast = () => {
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: -100,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
+    Animated.timing(slideAnim, {
+      toValue: -100,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
       if (onClose) onClose();
     });
   };
 
   const getToastStyles = () => {
     const baseStyles = {
-      backgroundColor: currentTheme.colors.cardBackground,
-      borderColor: currentTheme.colors.borderColor,
       borderWidth: 1,
     };
 
@@ -110,26 +93,26 @@ const CustomToast = ({
       case 'success':
         return {
           ...baseStyles,
-          backgroundColor: currentTheme.colors.success + '20',
+          backgroundColor: currentTheme.colors.success,
           borderColor: currentTheme.colors.success,
         };
       case 'error':
         return {
           ...baseStyles,
-          backgroundColor: currentTheme.colors.error + '20',
+          backgroundColor: currentTheme.colors.error,
           borderColor: currentTheme.colors.error,
         };
       case 'warning':
         return {
           ...baseStyles,
-          backgroundColor: currentTheme.colors.warning + '20',
+          backgroundColor: currentTheme.colors.warning,
           borderColor: currentTheme.colors.warning,
         };
       case 'info':
       default:
         return {
           ...baseStyles,
-          backgroundColor: currentTheme.colors.info + '20',
+          backgroundColor: currentTheme.colors.info,
           borderColor: currentTheme.colors.info,
         };
     }
@@ -138,14 +121,14 @@ const CustomToast = ({
   const getIconAndColor = () => {
     switch (type) {
       case 'success':
-        return { icon: 'checkmark-circle', color: currentTheme.colors.success };
+        return { icon: 'checkmark-circle', color: '#ffffff' };
       case 'error':
-        return { icon: 'close-circle', color: currentTheme.colors.error };
+        return { icon: 'close-circle', color: '#ffffff' };
       case 'warning':
-        return { icon: 'warning', color: currentTheme.colors.warning };
+        return { icon: 'warning', color: '#ffffff' };
       case 'info':
       default:
-        return { icon: 'information-circle', color: currentTheme.colors.info };
+        return { icon: 'information-circle', color: '#ffffff' };
     }
   };
 
@@ -159,7 +142,6 @@ const CustomToast = ({
         styles.container,
         getToastStyles(),
         {
-          opacity: fadeAnim,
           transform: [{ translateY: slideAnim }],
           top: position === 'top' ? 50 : undefined,
           bottom: position === 'bottom' ? 50 : undefined,
@@ -167,12 +149,12 @@ const CustomToast = ({
       ]}
     >
       <View style={styles.content}>
-        <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+        <View style={[styles.iconContainer, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
           <Ionicons name={icon} size={20} color={color} />
         </View>
         
         <Text style={[styles.message, { 
-          color: currentTheme.colors.text,
+          color: '#ffffff',
           fontFamily: currentTheme.typography?.fontFamily?.regular || 'Mulish-Regular',
           fontSize: currentTheme.typography?.fontSize?.sm || 14,
           lineHeight: 20,
@@ -188,7 +170,7 @@ const CustomToast = ({
           <Ionicons 
             name="close" 
             size={16} 
-            color={currentTheme.colors.textMuted} 
+            color="#ffffff" 
           />
         </TouchableOpacity>
       </View>

@@ -80,6 +80,17 @@ export const apiUtils = {
 
   // Parse response data
   parseResponse: (response) => {
+    // Ensure response.data is an object before trying to access its properties
+    if (!response || typeof response.data !== 'object' || response.data === null) {
+      return {
+        data: response?.data || null,
+        message: null,
+        total: null,
+        totalPages: null,
+        currentPage: null,
+      };
+    }
+
     return {
       data: response.data?.data || response.data,
       message: response.data?.message,

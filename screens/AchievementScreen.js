@@ -5,115 +5,176 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
+  RefreshControl,
 } from 'react-native';
-import { Card } from 'react-native-elements';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/AuthContext';
+import { createGlobalStyles } from '../utils/globalStyles';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { userAchievementService, apiUtils } from '../services';
 
 export default function AchievementScreen() {
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
 
+  const navigation = useNavigation();
   const { theme } = useTheme();
   const { showError } = useToast();
+  const { user } = useAuth();
+  const globalStyles = createGlobalStyles(theme);
 
   useEffect(() => {
-    fetchAchievements();
-  }, [currentPage]);
+    if (user?._id) {
+      fetchAchievements();
+    }
+  }, [user?._id]);
 
-  const fetchAchievements = async () => {
+  const fetchAchievements = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (!user?._id) {
+        console.log('No userId available, skipping achievement fetch');
+        return;
+      }
+
+      if (!isRefresh) {
+        setLoading(true);
+      }
       setError(null);
-      const response = await userAchievementService.getUserAchievements({
-        page: currentPage,
-        limit: 10
+      
+      const response = await userAchievementService.getUserAchievementsByUserId(user._id, {
+        page: 1,
+        limit: 50
       });
       
       const result = apiUtils.parseResponse(response);
+      console.log(result.data);
       
-      if (result.data && Array.isArray(result.data.achievements)) {
-        setAchievements(result.data.achievements);
-        setTotalPages(result.data.totalPages || 0);
+      if (result.data && Array.isArray(result.data)) {
+        setAchievements(result.data);
       } else {
-        setError('Invalid data structure received');
+        setAchievements([]);
       }
     } catch (err) {
       console.error('Error fetching user achievements:', err);
       const errorInfo = apiUtils.handleError(err);
       setError(errorInfo.message);
-      showError('Error', errorInfo.message);
+      showError('Failed to load achievements');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAchievements(true);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
   const renderAchievement = ({ item }) => (
-    <Card containerStyle={[styles.card, { backgroundColor: theme.colors.cardBackground }]}>
-      <View style={styles.achievementHeader}>
-        <Image
-          source={{ uri: item.achievement.icon || 'https://via.placeholder.com/50' }}
-          style={styles.achievementIcon}
-        />
-        <View style={styles.achievementInfo}>
+    <View style={[styles.achievementCard, { backgroundColor: theme.colors.cardBackground }]}>
+      <View style={styles.achievementContent}>
+        <View style={styles.achievementHeader}>
           <Text style={[styles.achievementTitle, { color: theme.colors.text }]}>
-            {item.achievement.title}
+            {item.achievement?.title || 'Unknown Achievement'}
           </Text>
-          <Text style={[styles.achievementDescription, { color: theme.colors.textSecondary }]}>
-            {item.achievement.description}
-          </Text>
+          <Ionicons name="trophy" size={20} color="#FFD700" />
         </View>
-      </View>
-      <View style={styles.achievementFooter}>
+        <Text style={[styles.achievementDescription, { color: theme.colors.textSecondary }]}>
+          {item.achievement?.description || 'No description available'}
+        </Text>
         <Text style={[styles.achievementDate, { color: theme.colors.textMuted }]}>
-          Earned: {new Date(item.earnedAt).toLocaleDateString()}
+          Awarded: {formatDate(item.createdAt || item.earnedAt || item.dateAwarded)}
         </Text>
       </View>
-    </Card>
+    </View>
   );
 
-  if (loading) {
-    return <LoadingSpinner fullScreen text="Loading achievements..." />;
-  }
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <View style={styles.headerTop}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <View style={styles.titleContainer}>
+          <Text style={[globalStyles.title, styles.headerTitle, { color: theme.colors.text }]}>
+            My Achievements
+          </Text>
+        </View>
+        <View style={styles.headerSpacer} />
+      </View>
+      <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
+        Track your learning milestones and accomplishments
+      </Text>
+    </View>
+  );
 
-  if (error) {
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="trophy-outline" size={64} color={theme.colors.textMuted} />
+      <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 16 }]}>
+        No achievements earned yet.
+      </Text>
+      <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
+        Keep learning to unlock achievements!
+      </Text>
+    </View>
+  );
+
+  if (!user?._id) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <Text style={[styles.errorText, { color: theme.colors.error }]}>
-          Error: {error}
-        </Text>
-        <TouchableOpacity style={styles.retryButton} onPress={fetchAchievements}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+        <View style={styles.emptyContainer}>
+          <Ionicons name="person-outline" size={64} color={theme.colors.textMuted} />
+          <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 16 }]}>
+            User not authenticated.
+          </Text>
+          <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }]}>
+            Please log in to view your achievements.
+          </Text>
+        </View>
       </View>
     );
   }
 
+  if (loading && !refreshing) {
+    return <LoadingSpinner fullScreen text="Loading achievements..." />;
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <Text style={[styles.title, { color: theme.colors.text }]}>My Achievements</Text>
-      
-      {achievements.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-            No achievements earned yet. Keep learning to unlock achievements!
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={achievements}
-          renderItem={renderAchievement}
-          keyExtractor={(item) => item._id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContainer}
-        />
-      )}
+      <FlatList
+        data={achievements}
+        renderItem={renderAchievement}
+        keyExtractor={(item) => item._id}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.flatListContent}
+      />
     </View>
   );
 }
@@ -121,161 +182,80 @@ export default function AchievementScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-    padding: 20,
+    backgroundColor: '#202020',
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#fff',
-    fontSize: 16,
-  },
-  errorText: {
-    color: '#FF4C4C',
-    fontSize: 18,
-    textAlign: 'center',
-    marginHorizontal: 20,
-  },
-  retryButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#4CC2FF',
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  noAchievementsText: {
-    color: '#bbb',
-    fontSize: 18,
-    textAlign: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 25,
-    marginTop: 20,
-  },
-  listContent: {
+  flatListContent: {
     paddingBottom: 20,
   },
-  achievementCard: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    borderWidth: 4,
-    borderColor: 'white',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  medalIcon: {
-    marginRight: 15,
-  },
-  achievementTextContainer: {
-    flex: 1,
-  },
-  achievementName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  achievementDescription: {
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  achievementDate: {
-    fontSize: 12,
-    color: '#888',
-    fontStyle: 'italic',
-  },
-  paginationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    marginTop: 20,
-    paddingHorizontal: 10,
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 10,
   },
-  paginationButton: {
-    backgroundColor: '#4CC2FF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    padding: 8,
     borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  paginationButtonText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: 'bold',
+  headerSpacer: {
+    width: 40,
   },
-  paginationText: {
-    color: '#fff',
-    fontSize: 16,
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
-  // Additional styles needed by the component
-  card: {
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: 'Mulish-Bold',
+  },
+  achievementCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
     borderRadius: 12,
-    marginVertical: 10,
-    marginHorizontal: 15,
-    padding: 0,
+    borderWidth: 1,
+    borderColor: '#1D1D1D',
     overflow: 'hidden',
-    backgroundColor: '#2a2a2a',
-    borderColor: '#333',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  achievementContent: {
+    padding: 16,
   },
   achievementHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
-  },
-  achievementIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 15,
-  },
-  achievementInfo: {
-    flex: 1,
+    marginBottom: 8,
   },
   achievementTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  achievementFooter: {
-    paddingHorizontal: 15,
-    paddingBottom: 15,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  emptyText: {
-    fontSize: 18,
-    textAlign: 'center',
+    fontFamily: 'Mulish-Bold',
     lineHeight: 24,
+    flex: 1,
+    marginRight: 8,
   },
-  listContainer: {
-    paddingBottom: 20,
+  achievementDescription: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Regular',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  achievementDate: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Regular',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
   },
 });

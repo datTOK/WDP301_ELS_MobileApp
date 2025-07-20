@@ -6,9 +6,9 @@ import { Image } from 'react-native-elements'
 import { Ionicons } from '@expo/vector-icons'; 
 import { useAuth } from '../context/AuthContext'; 
 import RenderHtml from 'react-native-render-html'; 
-import { MOBILE_SERVER_URL } from '@env'; 
 import { useToast } from '../context/ToastContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { blogService, apiUtils } from '../services';
 
 export default function BlogDetailScreen({ route, navigation }) {
   const { blogId } = route.params;
@@ -26,50 +26,55 @@ export default function BlogDetailScreen({ route, navigation }) {
     setLoading(true); 
     setError(null);   
 
-    if (!userToken || !blogId) {
-      setError("Authentication token or Blog ID is missing. Please try again.");
+    if (!blogId) {
+      setError("Blog ID is missing. Please try again.");
       setLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${MOBILE_SERVER_URL}api/blogs/${blogId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${userToken}`, 
-        },
-      });
+      console.log('Fetching blog with ID:', blogId);
+      const response = await blogService.getBlogById(blogId);
+      console.log('Raw API response:', response);
+      
+      const result = apiUtils.parseResponse(response);
+      console.log('Parsed result:', result);
 
-      const result = await response.json(); 
-      console.log("Full fetched blog data:", result); 
-      console.log("Blog content specifically:", result.blog?.content); 
-
-      if (response.ok) {
-        setBlog(result.blog);
+      if (result.data) {
+        console.log('Blog data received:', result.data);
+        // Check if the blog data is in result.data.blog (from API response structure)
+        const blogData = result.data.blog || result.data;
+        console.log('Extracted blog data:', blogData);
+        console.log('Blog title:', blogData.title);
+        console.log('Blog content:', blogData.content);
+        console.log('Blog user:', blogData.user);
+        setBlog(blogData);
       } else {
         const errorMessage = result.message || 'Failed to fetch blog details.';
+        console.error('No data in response:', result);
         setError(errorMessage);
         showError('API Error', errorMessage); 
       }
     } catch (err) {
       console.error('Network or parsing error:', err);
-      setError('Network error. Could not connect to the server.');
-      showError('Network Error', 'Could not connect to the server. Please check your connection.');
+      const errorInfo = apiUtils.handleError(err);
+      setError(errorInfo.message);
+      showError('Network Error', errorInfo.message);
     } finally {
       setLoading(false); 
     }
-  }, [blogId, userToken]); 
+  }, [blogId]); 
 
-  // useEffect hook to call fetchBlogDetails when component mounts or userToken/blogId changes
+  // useEffect hook to call fetchBlogDetails when component mounts or blogId changes
   useEffect(() => {
-    if (userToken && blogId) {
+    if (blogId) {
       fetchBlogDetails();
     } else {
-      // If no token or blogId, set loading to false and show appropriate error
+      // If no blogId, set loading to false and show appropriate error
       setLoading(false);
-      setError("Please ensure you are logged in and a valid blog ID is provided.");
+      setError("Please ensure a valid blog ID is provided.");
     }
-  }, [fetchBlogDetails, userToken, blogId]); 
+  }, [fetchBlogDetails, blogId]); 
 
   const handleGoBack = () => {
     navigation.goBack();
@@ -122,20 +127,60 @@ export default function BlogDetailScreen({ route, navigation }) {
           </View>
         )}
 
-        <Text style={styles.title}>{blog.title}</Text>
+        <Text style={styles.title}>{blog.title || 'Untitled Blog'}</Text>
 
         <Text style={styles.meta}>
-          By {blog.user?.username || 'Unknown'} | {new Date(blog.createdAt).toLocaleDateString()}
+          By {blog.user?.username || blog.author || 'Unknown'} | {new Date(blog.createdAt || blog.created_at || Date.now()).toLocaleDateString()}
         </Text>
 
-        {blog.content ? ( 
-          <RenderHtml
-            contentWidth={width - 40}
-            source={{ html: blog.content }}
-          />
+        {blog.content && blog.content.trim() ? ( 
+          <View style={styles.contentContainer}>
+            <RenderHtml
+              contentWidth={width - 40}
+              source={{ html: blog.content }}
+              baseStyle={styles.htmlContent}
+              enableExperimentalMarginCollapsing={true}
+              renderersProps={{
+                img: {
+                  enableExperimentalPercentWidth: true,
+                },
+              }}
+              onHTMLLoadError={(error) => {
+                console.error('HTML rendering error:', error);
+              }}
+              onTTreeChange={(tree) => {
+                console.log('HTML tree changed:', tree);
+              }}
+            />
+          </View>
+        ) : blog.body && blog.body.trim() ? (
+          <View style={styles.contentContainer}>
+            <RenderHtml
+              contentWidth={width - 40}
+              source={{ html: blog.body }}
+              baseStyle={styles.htmlContent}
+              enableExperimentalMarginCollapsing={true}
+              renderersProps={{
+                img: {
+                  enableExperimentalPercentWidth: true,
+                },
+              }}
+              onHTMLLoadError={(error) => {
+                console.error('HTML rendering error:', error);
+              }}
+            />
+          </View>
+        ) : blog.description && blog.description.trim() ? (
+          <View style={styles.contentContainer}>
+            <Text style={styles.htmlContent}>{blog.description}</Text>
+          </View>
         ) : (
           <View style={styles.noDataContainer}>
-            <Text style={styles.noDataText}>Blog content is empty.</Text>
+            <Text style={styles.noDataText}>Blog content is empty or not available.</Text>
+            <Text style={styles.debugText}>Available fields: {Object.keys(blog).join(', ')}</Text>
+            <Text style={styles.debugText}>Content field: {JSON.stringify(blog.content)}</Text>
+            <Text style={styles.debugText}>Body field: {JSON.stringify(blog.body)}</Text>
+            <Text style={styles.debugText}>Description field: {JSON.stringify(blog.description)}</Text>
           </View>
         )}
       </ScrollView>
@@ -146,13 +191,13 @@ export default function BlogDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#202020',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#202020',
   },
   loadingText: {
     color: '#fff',
@@ -164,7 +209,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#202020',
   },
   errorText: {
     color: '#ff6b6b', 
@@ -188,7 +233,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#202020',
   },
   noDataText: {
     color: '#bbb',
@@ -250,5 +295,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 20,
     padding: 8,
+  },
+  contentContainer: {
+    marginTop: 10,
+  },
+  htmlContent: {
+    color: '#fff',
+    fontSize: 18,
+    lineHeight: 28,
+  },
+  debugText: {
+    color: '#ff6b6b',
+    fontSize: 12,
+    marginTop: 10,
+    textAlign: 'center',
   },
 });

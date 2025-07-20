@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
+import LeaderboardScreen from '../screens/LeaderboardScreen';
 import AchievementScreen from '../screens/AchievementScreen';
 import CoursesScreen from '../screens/CoursesScreen';
 import MembershipScreen from '../screens/MembershipScreen';
@@ -17,10 +18,50 @@ import CourseOverviewScreen from '../screens/CourseOverviewScreen';
 import CourseLessonScreen from '../screens/CourseLessonScreen';
 import TestScreen from '../screens/TestScreen';
 import TestScreenDetail from '../screens/TestScreenDetail';
+import FlashcardSetsScreen from '../screens/FlashcardSetsScreen';
+import FlashcardSetDetailScreen from '../screens/FlashcardSetDetailScreen';
+import FlashcardStudyScreen from '../screens/FlashcardStudyScreen';
+import CreateFlashcardSetScreen from '../screens/CreateFlashcardSetScreen';
+import MyFlashcardSetsScreen from '../screens/MyFlashcardSetsScreen';
 import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+function FlashcardStackScreen() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        cardStyle: { backgroundColor: '#202020' },
+      }}
+    >
+      <Stack.Screen name="FlashcardSets" component={FlashcardSetsScreen} />
+      <Stack.Screen name="MyFlashcardSets" component={MyFlashcardSetsScreen} />
+      <Stack.Screen
+        name="FlashcardSetDetail"
+        component={FlashcardSetDetailScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="FlashcardStudy"
+        component={FlashcardStudyScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="CreateFlashcardSet"
+        component={CreateFlashcardSetScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 function BlogStackScreen() {
   return (
@@ -52,6 +93,21 @@ export function ProfileStackScreen() {
     >
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      <Stack.Screen name="Achievements" component={AchievementScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function LoginStackScreen() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerShown: false,
+        cardStyle: { backgroundColor: '#202020' },
+      }}
+    >
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Signup" component={SignupScreen} />
     </Stack.Navigator>
   );
 }
@@ -128,6 +184,8 @@ function MyCoursesStackScreen() {
 }
 
 export function TabNavigator() {
+  const { userToken } = useAuth();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -137,20 +195,21 @@ export function TabNavigator() {
 
           if (route.name === 'Home') {
             iconName = 'home';
-          } else if (route.name === 'Achievements') {
+          } else if (route.name === 'Leaderboard') {
             iconName = 'trophy';
           } else if (route.name === 'Courses') {
             iconName = 'book';
+          } else if (route.name === 'Flashcards') {
+            iconName = 'layers';
           } else if (route.name === 'Membership') {
             iconName = 'card';
           } else if (route.name === 'Profile') {
             iconName = 'person';
+          } else if (route.name === 'Login') {
+            iconName = 'log-in';
           } else if (route.name === 'BlogTab') {
             iconName = 'newspaper';
           }
-          // } else if (route.name === 'MyCourses') {
-          //   iconName = 'school';
-          // }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#4CC2FF',
@@ -170,11 +229,16 @@ export function TabNavigator() {
       }
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Achievements" component={AchievementScreen} />
+      <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
       <Tab.Screen name="Courses" component={CoursesStackScreen} options={{ tabBarLabel: 'Courses' }} />
+      <Tab.Screen name="Flashcards" component={FlashcardStackScreen} options={{ tabBarLabel: 'Flashcards' }} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
       <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog' }} />
-      <Tab.Screen name="Profile" component={ProfileStackScreen} />
+      {userToken ? (
+        <Tab.Screen name="Profile" component={ProfileStackScreen} />
+      ) : (
+        <Tab.Screen name="Login" component={LoginStackScreen} options={{ tabBarLabel: 'Login' }} />
+      )}
     </ Tab.Navigator>
   );
 }
@@ -190,7 +254,6 @@ export function AuthStackScreen() {
     >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
-      <Stack.Screen name="GuestHome" component={HomeScreen} />
     </Stack.Navigator>
   );
 }

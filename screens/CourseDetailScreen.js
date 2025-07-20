@@ -401,9 +401,8 @@ const CourseDetailScreen = ({ route, navigation }) => {
   // Create user lesson record
   const createUserLesson = async () => {
     try {
-      const userId = await AsyncStorage.getItem("userId");
       const response = await userLessonService.createUserLesson({
-        userId: userId,
+        userId: user._id,
         lessonId: lessonId,
       });
 
@@ -458,7 +457,6 @@ const CourseDetailScreen = ({ route, navigation }) => {
   // Fetch or create user lesson record, then fetch userLesson data
   const fetchOrCreateUserLesson = async () => {
     try {
-      const userId = await AsyncStorage.getItem("userId");
       // Try to fetch userLesson first
       try {
         const response = await userLessonService.getUserLessonByLessonId(lessonId);
@@ -473,7 +471,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
       } catch (error) {
         // If not found, create it
         const createResponse = await userLessonService.createUserLesson({
-          userId: userId,
+          userId: user._id,
           lessonId: lessonId,
         });
         const result = apiUtils.parseResponse(createResponse);

@@ -68,8 +68,16 @@ export default function SignupScreen({ navigation }) {
       showError('Passwords do not match');
       return;
     }
-    if (password.length < 6) {
-      showError('Password must be at least 6 characters long');
+
+    // Check password requirements based on backend validation
+    const hasLowercase = /[a-z]/.test(password);
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSymbol = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    const isLengthValid = password.length >= 8 && password.length <= 50;
+
+    if (!isLengthValid || !hasLowercase || !hasUppercase || !hasNumber || !hasSymbol) {
+      showError('Password must contain at least 1 lowercase letter, 1 uppercase letter, 1 number, 1 symbol, and be between 8-50 characters long.');
       return;
     }
 
@@ -234,6 +242,76 @@ export default function SignupScreen({ navigation }) {
             </View>
           </View>
 
+          {/* Password Requirements */}
+          <View style={[localStyles.requirementsCard, { 
+            backgroundColor: theme.colors.cardBackground,
+            borderColor: theme.colors.borderColor 
+          }]}>
+            <Text style={[localStyles.requirementsTitle, { color: theme.colors.text }]}>
+              Password Requirements
+            </Text>
+            <View style={localStyles.requirementItem}>
+              <Ionicons 
+                name={password.length >= 8 && password.length <= 50 ? 'checkmark-circle' : 'ellipse-outline'} 
+                size={16} 
+                color={password.length >= 8 && password.length <= 50 ? theme.colors.success : theme.colors.textMuted} 
+              />
+              <Text style={[localStyles.requirementText, { color: theme.colors.textSecondary }]}>
+                Between 8-50 characters long
+              </Text>
+            </View>
+            <View style={localStyles.requirementItem}>
+              <Ionicons 
+                name={/[a-z]/.test(password) ? 'checkmark-circle' : 'ellipse-outline'} 
+                size={16} 
+                color={/[a-z]/.test(password) ? theme.colors.success : theme.colors.textMuted} 
+              />
+              <Text style={[localStyles.requirementText, { color: theme.colors.textSecondary }]}>
+                At least 1 lowercase letter
+              </Text>
+            </View>
+            <View style={localStyles.requirementItem}>
+              <Ionicons 
+                name={/[A-Z]/.test(password) ? 'checkmark-circle' : 'ellipse-outline'} 
+                size={16} 
+                color={/[A-Z]/.test(password) ? theme.colors.success : theme.colors.textMuted} 
+              />
+              <Text style={[localStyles.requirementText, { color: theme.colors.textSecondary }]}>
+                At least 1 uppercase letter
+              </Text>
+            </View>
+            <View style={localStyles.requirementItem}>
+              <Ionicons 
+                name={/\d/.test(password) ? 'checkmark-circle' : 'ellipse-outline'} 
+                size={16} 
+                color={/\d/.test(password) ? theme.colors.success : theme.colors.textMuted} 
+              />
+              <Text style={[localStyles.requirementText, { color: theme.colors.textSecondary }]}>
+                At least 1 number
+              </Text>
+            </View>
+            <View style={localStyles.requirementItem}>
+              <Ionicons 
+                name={/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? 'checkmark-circle' : 'ellipse-outline'} 
+                size={16} 
+                color={/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? theme.colors.success : theme.colors.textMuted} 
+              />
+              <Text style={[localStyles.requirementText, { color: theme.colors.textSecondary }]}>
+                At least 1 symbol (!@#$%^&*...)
+              </Text>
+            </View>
+            <View style={localStyles.requirementItem}>
+              <Ionicons 
+                name={password === confirmPassword && password.length > 0 ? 'checkmark-circle' : 'ellipse-outline'} 
+                size={16} 
+                color={password === confirmPassword && password.length > 0 ? theme.colors.success : theme.colors.textMuted} 
+              />
+              <Text style={[localStyles.requirementText, { color: theme.colors.textSecondary }]}>
+                Passwords match
+              </Text>
+            </View>
+          </View>
+
           <TouchableOpacity
             style={styles.button}
             onPress={handleSignup}
@@ -304,6 +382,27 @@ const localStyles = StyleSheet.create({
     right: 12,
     top: 12,
     padding: 4,
+  },
+  requirementsCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  requirementsTitle: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+    marginBottom: 12,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  requirementText: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Regular',
+    marginLeft: 8,
   },
   linkText: {
     color: '#4CC2FF',

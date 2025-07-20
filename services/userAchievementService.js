@@ -32,7 +32,7 @@ class UserAchievementService {
    * @returns {Promise<Object>} User achievements response
    */
   async getUserAchievementsByUserId(userId, params = {}) {
-    return api.get(`/api/user-achievements/${userId}/user`, { params });
+    return api.get(`/api/user-achievements/${userId}/users`, { params });
   }
 }
 

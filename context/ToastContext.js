@@ -33,7 +33,7 @@ export const ToastProvider = ({ children }) => {
     showToast(message, 'success', duration);
   }, [showToast]);
 
-  const showError = useCallback((message, duration = 4000) => {
+  const showError = useCallback((message, duration = 6000) => {
     showToast(message, 'error', duration);
   }, [showToast]);
 

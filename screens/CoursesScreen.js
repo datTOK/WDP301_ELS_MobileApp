@@ -45,6 +45,9 @@ const CourseItem = ({ course, navigation }) => {
             style={courseItemStyles.courseImage}
           />
           <View style={courseItemStyles.overlay} />
+          <View style={courseItemStyles.badgeContainer}>
+            <Text style={courseItemStyles.badge}>Course</Text>
+          </View>
         </View>
 
         <View style={courseItemStyles.contentContainer}>
@@ -58,15 +61,15 @@ const CourseItem = ({ course, navigation }) => {
 
           <View style={courseItemStyles.footer}>
             <View style={courseItemStyles.dateContainer}>
-              <Ionicons name="calendar-outline" size={14} color="#888" />
+              <Ionicons name="calendar-outline" size={14} color="#4CC2FF" />
               <Text style={courseItemStyles.date}>
                 {new Date(course.createdAt).toLocaleDateString()}
               </Text>
             </View>
 
             <View style={courseItemStyles.readMoreContainer}>
-              <Text style={courseItemStyles.readMoreText}>Read More</Text>
-              <Ionicons name="arrow-forward" size={16} color="#007bff" />
+              <Text style={courseItemStyles.readMoreText}>View Course</Text>
+              <Ionicons name="arrow-forward" size={16} color="#4CC2FF" />
             </View>
           </View>
         </View>
@@ -81,16 +84,16 @@ const courseItemStyles = StyleSheet.create({
     marginHorizontal: 16,
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: '#2a2a2a',
     borderRadius: 16,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 6,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: '#333',
   },
   imageContainer: {
     position: "relative",
@@ -99,26 +102,46 @@ const courseItemStyles = StyleSheet.create({
   courseImage: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#444",
   },
   overlay: {
-    display: "none",
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  badge: {
+    backgroundColor: '#4CC2FF',
+    color: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
+    fontFamily: 'Mulish-Bold',
   },
   contentContainer: {
     padding: 20,
   },
   title: {
     fontSize: 20,
-    fontWeight: "700",
-    color: "#222",
+    fontFamily: 'Mulish-Bold',
+    color: "#fff",
     marginBottom: 12,
     lineHeight: 26,
   },
   description: {
     fontSize: 15,
-    color: "#444",
+    color: "#ccc",
     lineHeight: 22,
     marginBottom: 16,
+    fontFamily: 'Mulish-Regular',
   },
   footer: {
     flexDirection: "row",
@@ -132,8 +155,8 @@ const courseItemStyles = StyleSheet.create({
   },
   date: {
     fontSize: 13,
-    color: "#888",
-    fontWeight: "500",
+    color: "#aaa",
+    fontFamily: 'Mulish-Medium',
   },
   readMoreContainer: {
     flexDirection: "row",
@@ -142,8 +165,8 @@ const courseItemStyles = StyleSheet.create({
   },
   readMoreText: {
     fontSize: 14,
-    color: "#007bff",
-    fontWeight: "600",
+    color: "#4CC2FF",
+    fontFamily: 'Mulish-Bold',
   },
 });
 
@@ -427,32 +450,35 @@ export default function CoursesScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#202020",
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 10,
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#202020",
   },
   headerTitle: {
     fontSize: 32,
-    fontWeight: "800",
-    color: "#222",
+    fontFamily: 'Mulish-Bold',
+    color: "#fff",
     letterSpacing: -0.5,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: "#888",
+    color: "#aaa",
     marginTop: 4,
-    fontWeight: "500",
+    fontFamily: 'Mulish-Medium',
   },
   controlsContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: "#2a2a2a",
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+    borderBottomColor: "#333",
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
   },
   searchBarContainer: {
     backgroundColor: "transparent",
@@ -462,16 +488,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   searchBarInputContainer: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#333",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: "#444",
     height: 50,
   },
   searchBarInput: {
-    color: "#222",
+    color: "#fff",
     fontSize: 16,
-    fontWeight: "500",
+    fontFamily: 'Mulish-Medium',
   },
   filtersContainer: {
     gap: 16,
@@ -481,8 +507,8 @@ const styles = StyleSheet.create({
   },
   filterLabel: {
     fontSize: 14,
-    color: "#888",
-    fontWeight: "600",
+    color: "#aaa",
+    fontFamily: 'Mulish-Bold',
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -494,18 +520,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#333",
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: "#444",
   },
   activeFilterButton: {
-    backgroundColor: "#007bff",
-    borderColor: "#007bff",
+    backgroundColor: "#4CC2FF",
+    borderColor: "#4CC2FF",
   },
   filterButtonText: {
     fontSize: 14,
-    color: "#888",
-    fontWeight: "600",
+    color: "#ccc",
+    fontFamily: 'Mulish-Medium',
   },
   activeFilterButtonText: {
     color: "#fff",
@@ -525,21 +551,22 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 20,
-    fontWeight: "700",
-    color: "#222",
+    fontFamily: 'Mulish-Bold',
+    color: "#fff",
     textAlign: "center",
   },
   errorText: {
     fontSize: 16,
-    color: "#444",
+    color: "#ccc",
     textAlign: "center",
     lineHeight: 24,
+    fontFamily: 'Mulish-Regular',
   },
   retryButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#007bff",
+    backgroundColor: "#4CC2FF",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -548,7 +575,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
+    fontFamily: 'Mulish-Bold',
   },
   emptyContainer: {
     flex: 1,
@@ -562,15 +589,16 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: "700",
-    color: "#222",
+    fontFamily: 'Mulish-Bold',
+    color: "#fff",
     textAlign: "center",
   },
   emptyText: {
     fontSize: 16,
-    color: "#888",
+    color: "#aaa",
     textAlign: "center",
     lineHeight: 24,
+    fontFamily: 'Mulish-Regular',
   },
   paginationContainer: {
     flexDirection: "row",
@@ -579,11 +607,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 20,
     marginBottom: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#2a2a2a",
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: "#333",
   },
   paginationButton: {
     flexDirection: "row",
@@ -592,28 +620,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#333",
   },
   disabledPaginationButton: {
     opacity: 0.5,
   },
   paginationButtonText: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#222",
+    fontFamily: 'Mulish-Bold',
+    color: "#fff",
   },
   disabledPaginationButtonText: {
-    color: "#bbb",
+    color: "#aaa",
   },
   pageIndicator: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#333",
     borderRadius: 12,
   },
   pageInfo: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#888",
+    fontFamily: 'Mulish-Bold',
+    color: "#4CC2FF",
   },
 });
