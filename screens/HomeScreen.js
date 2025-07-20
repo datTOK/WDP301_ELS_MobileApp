@@ -19,6 +19,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { courseService, blogService, apiUtils } from '../services';
 import Swiper from 'react-native-swiper';
 import LottieView from 'lottie-react-native';
+import AIChatBot from '../components/AiChatBox';
 
 const { width } = Dimensions.get('window');
 
@@ -141,128 +142,131 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView 
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      contentContainerStyle={styles.scrollContainer}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Image Swiper */}
-      <View style={localStyles.swiperContainer}>
-        <Swiper
-          autoplay
-          autoplayTimeout={6}
-          showsPagination={true}
-          loop
-          dotStyle={localStyles.paginationDot}
-          activeDotStyle={[localStyles.activePaginationDot, { backgroundColor: theme.colors.text }]}
-        >
-          {imageUrls.map((url, index) => (
-            <Image
-              key={index}
-              source={{ uri: url }}
-              style={localStyles.swiperImage}
-              resizeMode="cover"
-            />
-          ))}
-        </Swiper>
-      </View>
-
-      <Divider style={[localStyles.sectionDivider, { backgroundColor: theme.colors.borderColor }]} />
-
-      {/* Welcome Section */}
-      <View style={localStyles.welcomeSection}>
-        <Text style={localStyles.welcomeTitle}>Welcome to ELS</Text>
-        <Text style={localStyles.welcomeSubtitle}>
-          Continue your English learning journey
-        </Text>
-        {userId && (
-          <Text style={localStyles.userId}>User ID: {userId}</Text>
-        )}
-      </View>
-
-      {/* Why Choose ELS Section */}
-      <View style={localStyles.whyChooseSection}>
-        <Text style={[localStyles.sectionTitle, { color: theme.colors.text }]}>Why Choose ELS?</Text>
-        <View style={[localStyles.featureCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
-          <Ionicons name="bulb-outline" size={30} color={theme.colors.primary} style={localStyles.featureIcon} />
-          <Text style={[localStyles.featureText, { color: theme.colors.text }]}>
-            ELS is one of the most chosen English learning apps in Vietnam and continues to grow largely.
-            We provide engaging lessons, interactive exercises, and a supportive community.
-          </Text>
-        </View>
-      </View>
-
-      {/* Quick Actions */}
-      <Card containerStyle={localStyles.actionsCard}>
-        <Card.Title style={localStyles.actionsTitle}>Quick Actions</Card.Title>
-        <View style={localStyles.actionsGrid}>
-          <TouchableOpacity
-            style={localStyles.actionButton}
-            onPress={() => navigation.navigate('Courses')}
-          >
-            <Ionicons name="book" size={24} color="#4CC2FF" />
-            <Text style={localStyles.actionText}>Courses</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={localStyles.actionButton}
-            onPress={() => navigation.navigate('BlogTab')}
-          >
-            <Ionicons name="newspaper" size={24} color="#28a745" />
-            <Text style={localStyles.actionText}>Blog</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={localStyles.actionButton}
-            onPress={() => navigation.navigate('Achievements')}
-          >
-            <Ionicons name="trophy" size={24} color="#ffc107" />
-            <Text style={localStyles.actionText}>Achievements</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={localStyles.actionButton}
-            onPress={() => navigation.navigate('Membership')}
-          >
-            <Ionicons name="card" size={24} color="#ff6b6b" />
-            <Text style={localStyles.actionText}>Membership</Text>
-          </TouchableOpacity>
-        </View>
-      </Card>
-
-      {/* Featured Courses */}
-      {courses.length > 0 && (
-        <Card containerStyle={localStyles.sectionCard}>
-          <Card.Title style={localStyles.sectionTitle}>Featured Courses</Card.Title>
-          {courses.map(renderCourseCard)}
-        </Card>
-      )}
-
-      {/* Latest Blogs */}
-      {blogs.length > 0 && (
-        <Card containerStyle={localStyles.sectionCard}>
-          <Card.Title style={localStyles.sectionTitle}>Latest Articles</Card.Title>
-          {blogs.map(renderBlogCard)}
-        </Card>
-      )}
-
-      {/* Lottie Animation */}
-      <LottieView
-        source={{ uri: 'https://lottie.host/dc75f86c-1920-48bf-9d38-e84684bd4612/NqkDK4PTpW.json' }}
-        speed={0.5}
-        autoPlay
-        style={localStyles.lottieAnimation} 
-      />
-
-      {/* Call to Action */}
-      <TouchableOpacity 
-        style={[localStyles.callToActionCard, { backgroundColor: theme.colors.primary }]} 
-        onPress={() => navigation.navigate('Courses')}
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: theme.colors.background }]}
+        contentContainerStyle={styles.scrollContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={localStyles.callToActionText}>Explore Our Courses!</Text>
-        <Ionicons name="arrow-forward-outline" size={24} color={'white'} />
-      </TouchableOpacity>
-    </ScrollView>
+        {/* Image Swiper */}
+        <View style={localStyles.swiperContainer}>
+          <Swiper
+            autoplay
+            autoplayTimeout={6}
+            showsPagination={true}
+            loop
+            dotStyle={localStyles.paginationDot}
+            activeDotStyle={[localStyles.activePaginationDot, { backgroundColor: theme.colors.text }]}
+          >
+            {imageUrls.map((url, index) => (
+              <Image
+                key={index}
+                source={{ uri: url }}
+                style={localStyles.swiperImage}
+                resizeMode="cover"
+              />
+            ))}
+          </Swiper>
+        </View>
+
+        <Divider style={[localStyles.sectionDivider, { backgroundColor: theme.colors.borderColor }]} />
+
+        {/* Welcome Section */}
+        <View style={localStyles.welcomeSection}>
+          <Text style={localStyles.welcomeTitle}>Welcome to ELS</Text>
+          <Text style={localStyles.welcomeSubtitle}>
+            Continue your English learning journey
+          </Text>
+          {userId && (
+            <Text style={localStyles.userId}>User ID: {userId}</Text>
+          )}
+        </View>
+
+        {/* Why Choose ELS Section */}
+        <View style={localStyles.whyChooseSection}>
+          <Text style={[localStyles.sectionTitle, { color: theme.colors.text }]}>Why Choose ELS?</Text>
+          <View style={[localStyles.featureCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
+            <Ionicons name="bulb-outline" size={30} color={theme.colors.primary} style={localStyles.featureIcon} />
+            <Text style={[localStyles.featureText, { color: theme.colors.text }]}>
+              ELS is one of the most chosen English learning apps in Vietnam and continues to grow largely.
+              We provide engaging lessons, interactive exercises, and a supportive community.
+            </Text>
+          </View>
+        </View>
+
+        {/* Quick Actions */}
+        <Card containerStyle={localStyles.actionsCard}>
+          <Card.Title style={localStyles.actionsTitle}>Quick Actions</Card.Title>
+          <View style={localStyles.actionsGrid}>
+            <TouchableOpacity
+              style={localStyles.actionButton}
+              onPress={() => navigation.navigate('Courses')}
+            >
+              <Ionicons name="book" size={24} color="#4CC2FF" />
+              <Text style={localStyles.actionText}>Courses</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={localStyles.actionButton}
+              onPress={() => navigation.navigate('BlogTab')}
+            >
+              <Ionicons name="newspaper" size={24} color="#28a745" />
+              <Text style={localStyles.actionText}>Blog</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={localStyles.actionButton}
+              onPress={() => navigation.navigate('Achievements')}
+            >
+              <Ionicons name="trophy" size={24} color="#ffc107" />
+              <Text style={localStyles.actionText}>Achievements</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={localStyles.actionButton}
+              onPress={() => navigation.navigate('Membership')}
+            >
+              <Ionicons name="card" size={24} color="#ff6b6b" />
+              <Text style={localStyles.actionText}>Membership</Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+
+        {/* Featured Courses */}
+        {courses.length > 0 && (
+          <Card containerStyle={localStyles.sectionCard}>
+            <Card.Title style={localStyles.sectionTitle}>Featured Courses</Card.Title>
+            {courses.map(renderCourseCard)}
+          </Card>
+        )}
+
+        {/* Latest Blogs */}
+        {blogs.length > 0 && (
+          <Card containerStyle={localStyles.sectionCard}>
+            <Card.Title style={localStyles.sectionTitle}>Latest Articles</Card.Title>
+            {blogs.map(renderBlogCard)}
+          </Card>
+        )}
+
+        {/* Lottie Animation */}
+        <LottieView
+          source={{ uri: 'https://lottie.host/dc75f86c-1920-48bf-9d38-e84684bd4612/NqkDK4PTpW.json' }}
+          speed={0.5}
+          autoPlay
+          style={localStyles.lottieAnimation}
+        />
+
+        {/* Call to Action */}
+        <TouchableOpacity
+          style={[localStyles.callToActionCard, { backgroundColor: theme.colors.primary }]}
+          onPress={() => navigation.navigate('Courses')}
+        >
+          <Text style={localStyles.callToActionText}>Explore Our Courses!</Text>
+          <Ionicons name="arrow-forward-outline" size={24} color={'white'} />
+        </TouchableOpacity>
+      </ScrollView>
+      <AIChatBot />
+    </View>
   );
 }
 
