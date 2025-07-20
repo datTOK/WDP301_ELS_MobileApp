@@ -19,6 +19,7 @@ import { createGlobalStyles } from '../utils/globalStyles';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { courseService, blogService, userService, apiUtils } from '../services';
 import LottieView from 'lottie-react-native';
+import AIChatBot from '../components/AiChatBox';
 
 const { width, height } = Dimensions.get('window');
 
