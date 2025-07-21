@@ -94,7 +94,7 @@ const FlashcardSetCard = ({ flashcardSet, navigation, theme }) => {
             title="Study"
             buttonStyle={[styles.studyButton, { backgroundColor: theme.colors.primary }]}
             titleStyle={[styles.studyButtonText, { color: theme.colors.buttonText }]}
-            onPress={() => navigation.navigate('FlashcardStudy', { setId: flashcardSet._id })}
+            onPress={() => navigation.navigate('FlashcardSetDetail', { setId: flashcardSet._id })}
           />
         </View>
       </TouchableOpacity>

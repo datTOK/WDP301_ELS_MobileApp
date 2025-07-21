@@ -20,7 +20,6 @@ import TestScreen from '../screens/TestScreen';
 import TestScreenDetail from '../screens/TestScreenDetail';
 import FlashcardSetsScreen from '../screens/FlashcardSetsScreen';
 import FlashcardSetDetailScreen from '../screens/FlashcardSetDetailScreen';
-import FlashcardStudyScreen from '../screens/FlashcardStudyScreen';
 import CreateFlashcardSetScreen from '../screens/CreateFlashcardSetScreen';
 import MyFlashcardSetsScreen from '../screens/MyFlashcardSetsScreen';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +30,7 @@ const Stack = createNativeStackNavigator();
 function FlashcardStackScreen() {
   return (
     <Stack.Navigator
+      initialRouteName="FlashcardSets"
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: '#202020' },
@@ -41,13 +41,6 @@ function FlashcardStackScreen() {
       <Stack.Screen
         name="FlashcardSetDetail"
         component={FlashcardSetDetailScreen}
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="FlashcardStudy"
-        component={FlashcardStudyScreen}
         options={{
           headerShown: false,
         }}

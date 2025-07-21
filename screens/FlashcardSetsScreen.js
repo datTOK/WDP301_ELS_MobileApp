@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Card, Button, SearchBar } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
@@ -105,7 +105,7 @@ const FlashcardSetCard = ({ flashcardSet, navigation, theme, showOwnerInfo = tru
             title="Study"
             buttonStyle={[styles.studyButton, { backgroundColor: theme.colors.primary }]}
             titleStyle={[styles.studyButtonText, { color: theme.colors.buttonText }]}
-            onPress={() => navigation.navigate('FlashcardStudy', { setId: flashcardSet._id })}
+            onPress={() => navigation.navigate('FlashcardSetDetail', { setId: flashcardSet._id })}
           />
         </View>
       </TouchableOpacity>
@@ -190,6 +190,16 @@ export default function FlashcardSetsScreen() {
   useEffect(() => {
     fetchFlashcardSets();
   }, [fetchFlashcardSets]);
+
+  // Reset to "All Sets" view when screen is focused (e.g., from tab navigation)
+  useFocusEffect(
+    useCallback(() => {
+      setViewMode("all");
+      setPage(1);
+      setSearch("");
+      setDebouncedSearch("");
+    }, [])
+  );
 
   const handleNextPage = () => {
     if (page < totalPages) setPage((prev) => prev + 1);

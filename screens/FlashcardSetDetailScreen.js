@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Card, Button } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +19,9 @@ import { useToast } from '../context/ToastContext';
 import { createGlobalStyles } from '../utils/globalStyles';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { flashcardService, flashcardSetService, apiUtils } from '../services';
+import * as Speech from 'expo-speech';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function FlashcardSetDetailScreen() {
   const [flashcardSet, setFlashcardSet] = useState(null);
@@ -24,6 +29,12 @@ export default function FlashcardSetDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  
+  // Animation values
+  const flipAnimation = useRef(new Animated.Value(0)).current;
+  const cardChangeAnimation = useRef(new Animated.Value(1)).current;
 
   const navigation = useNavigation();
   const route = useRoute();
@@ -45,8 +56,7 @@ export default function FlashcardSetDetailScreen() {
       // Fetch flashcard set details
       const setResponse = await flashcardSetService.getFlashcardSetById(setId);
       const setResult = apiUtils.parseResponse(setResponse);
-      console.log('Flashcard set response:', setResult);
-      setFlashcardSet(setResult.flashcardSet);
+      setFlashcardSet(setResult.data.flashcardSet);
 
       // Fetch flashcards for this set
       const cardsResponse = await flashcardService.getFlashcards(setId, {
@@ -56,7 +66,6 @@ export default function FlashcardSetDetailScreen() {
         sortBy: 'date'
       });
       const cardsResult = apiUtils.parseResponse(cardsResponse);
-      console.log('Flashcards response:', cardsResult);
       setFlashcards(cardsResult.data || []);
 
     } catch (err) {
@@ -111,7 +120,226 @@ export default function FlashcardSetDetailScreen() {
     });
   };
 
+  // Flashcard animation functions
+  const flipCard = () => {
+    Animated.timing(flipAnimation, {
+      toValue: isFlipped ? 0 : 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsFlipped(!isFlipped);
+    });
+  };
+
+  const nextCard = () => {
+    if (flashcards.length === 0) return;
+    
+    Animated.timing(cardChangeAnimation, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentCardIndex((prev) => (prev + 1) % flashcards.length);
+      setIsFlipped(false);
+      flipAnimation.setValue(0);
+      
+      Animated.timing(cardChangeAnimation, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const prevCard = () => {
+    if (flashcards.length === 0) return;
+    
+    Animated.timing(cardChangeAnimation, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentCardIndex((prev) => (prev - 1 + flashcards.length) % flashcards.length);
+      setIsFlipped(false);
+      flipAnimation.setValue(0);
+      
+      Animated.timing(cardChangeAnimation, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  // Auto-cycle through cards
+  useEffect(() => {
+    if (flashcards.length > 1) {
+      const interval = setInterval(() => {
+        nextCard();
+      }, 6000); // Change card every 6 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [flashcards.length, currentCardIndex]);
+
   const isOwner = user?._id === flashcardSet?.userId;
+
+  // Pronunciation function
+  const speakText = async (text) => {
+    try {
+      // Stop any current speech
+      await Speech.stop();
+      
+      // Speak the text with English pronunciation
+      await Speech.speak(text, {
+        language: 'en-US',
+        pitch: 1.0,
+        rate: 0.8,
+        quality: Speech.QUALITY_ENHANCED,
+      });
+    } catch (error) {
+      console.error('Error speaking text:', error);
+      showError('Unable to play pronunciation');
+    }
+  };
+
+  // Animated Flashcard Component
+  const AnimatedFlashcard = () => {
+    if (flashcards.length === 0) {
+      return (
+        <Card containerStyle={[styles.flashcardContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
+          <View style={styles.emptyFlashcard}>
+            <Ionicons name="document-outline" size={48} color={theme.colors.textMuted} />
+            <Text style={[styles.emptyFlashcardText, { color: theme.colors.textSecondary }]}>
+              No flashcards available
+            </Text>
+          </View>
+        </Card>
+      );
+    }
+
+    const currentCard = flashcards[currentCardIndex];
+    
+    // Simple opacity-based animation (more reliable on mobile)
+    const frontOpacity = flipAnimation.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [1, 0, 0],
+    });
+
+    const backOpacity = flipAnimation.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0, 0, 1],
+    });
+
+    const cardScale = cardChangeAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.95, 1],
+    });
+
+    return (
+      <Card containerStyle={[styles.flashcardContainer, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
+        <View style={styles.flashcardHeader}>
+          <Text style={[styles.flashcardCounter, { color: theme.colors.textMuted }]}>
+            {currentCardIndex + 1} / {flashcards.length}
+          </Text>
+          <Text style={[styles.tapToFlipText, { color: theme.colors.textMuted }]}>
+            Tap to flip
+          </Text>
+        </View>
+
+                <TouchableOpacity
+          style={styles.flashcardWrapper}
+          onPress={flipCard}
+          activeOpacity={0.9}
+        >
+          <Animated.View
+            style={[
+              styles.flashcardSide,
+              {
+                backgroundColor: theme.colors.primary,
+                opacity: frontOpacity,
+                transform: [{ scale: cardScale }],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.pronunciationButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                speakText(currentCard.englishContent);
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="volume-high" size={20} color="rgba(255,255,255,0.9)" />
+            </TouchableOpacity>
+            
+            <View style={styles.flashcardContent}>
+              <Text style={[styles.flashcardLabel, { color: 'rgba(255,255,255,0.8)' }]}>
+                English
+              </Text>
+              <Text style={[styles.flashcardText, { color: '#fff' }]}>
+                {currentCard.englishContent}
+              </Text>
+            </View>
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.flashcardSide,
+              {
+                backgroundColor: theme.colors.secondary || '#8B5CF6',
+                opacity: backOpacity,
+                transform: [{ scale: cardScale }],
+              },
+            ]}
+          >
+            <View style={styles.flashcardContent}>
+              <Text style={[styles.flashcardLabel, { color: 'rgba(255,255,255,0.8)' }]}>
+                Vietnamese
+              </Text>
+              <Text style={[styles.flashcardText, { color: '#fff' }]}>
+                {currentCard.vietnameseContent}
+              </Text>
+            </View>
+          </Animated.View>
+        </TouchableOpacity>
+
+        {flashcards.length > 1 && (
+          <View style={styles.flashcardControls}>
+            <TouchableOpacity
+              style={[styles.controlButton, { backgroundColor: theme.colors.surfaceBackground }]}
+              onPress={prevCard}
+            >
+              <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+
+            <View style={styles.progressIndicator}>
+              {flashcards.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.progressDot,
+                    {
+                      backgroundColor: index === currentCardIndex 
+                        ? theme.colors.primary 
+                        : theme.colors.borderColor
+                    }
+                  ]}
+                />
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.controlButton, { backgroundColor: theme.colors.surfaceBackground }]}
+              onPress={nextCard}
+            >
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
+        )}
+      </Card>
+    );
+  };
 
   if (loading && !refreshing) {
     return <LoadingSpinner fullScreen text="Loading flashcard set..." />;
@@ -204,22 +432,12 @@ export default function FlashcardSetDetailScreen() {
         </View>
       </Card>
 
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <Button
-          title="Practice"
-          icon={{
-            name: 'play-outline',
-            type: 'ionicon',
-            size: 20,
-            color: theme.colors.buttonText,
-          }}
-          buttonStyle={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
-          titleStyle={[styles.primaryButtonText, { color: theme.colors.buttonText }]}
-          onPress={() => navigation.navigate('FlashcardStudy', { setId: flashcardSet._id })}
-        />
+      {/* Animated Flashcard */}
+      <AnimatedFlashcard />
 
-        {isOwner && (
+      {/* Manage Cards Button (Owner Only) */}
+      {isOwner && (
+        <View style={styles.actionButtons}>
           <Button
             title="Manage Cards"
             icon={{
@@ -232,8 +450,8 @@ export default function FlashcardSetDetailScreen() {
             titleStyle={[styles.secondaryButtonText, { color: theme.colors.text }]}
             onPress={() => navigation.navigate('FlashcardManagement', { setId: flashcardSet._id })}
           />
-        )}
-      </View>
+        </View>
+      )}
 
       {/* Flashcards List */}
       <Card containerStyle={[styles.cardsCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
@@ -245,12 +463,23 @@ export default function FlashcardSetDetailScreen() {
           flashcards.map((flashcard, index) => (
             <View key={flashcard._id} style={[styles.flashcardItem, { borderBottomColor: theme.colors.borderColor }]}>
               <View style={styles.flashcardContent}>
-                <Text style={[styles.flashcardFront, { color: theme.colors.text }]}>
-                  {flashcard.englishContent}
-                </Text>
-                <Text style={[styles.flashcardBack, { color: theme.colors.textSecondary }]}>
-                  {flashcard.vietnameseContent}
-                </Text>
+                <View style={styles.flashcardTextRow}>
+                  <View style={styles.flashcardTexts}>
+                    <Text style={[styles.flashcardFront, { color: theme.colors.text }]}>
+                      {flashcard.englishContent}
+                    </Text>
+                    <Text style={[styles.flashcardBack, { color: theme.colors.textSecondary }]}>
+                      {flashcard.vietnameseContent}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.listPronunciationButton, { backgroundColor: theme.colors.primary }]}
+                    onPress={() => speakText(flashcard.englishContent)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="volume-high" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
               </View>
               <View style={styles.flashcardNumber}>
                 <Text style={[styles.numberText, { color: theme.colors.textMuted }]}>
@@ -467,5 +696,148 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: 'Mulish-Bold',
     fontSize: 16,
+  },
+  // Animated Flashcard Styles
+  flashcardContainer: {
+    borderRadius: 20,
+    margin: 15,
+    padding: 20,
+    minHeight: 280,
+  },
+  flashcardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  flashcardCounter: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Medium',
+  },
+  tapToFlipText: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Regular',
+    fontStyle: 'italic',
+  },
+  flashcardWrapper: {
+    height: 180,
+    marginBottom: 20,
+    position: 'relative',
+  },
+  flashcardSide: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  flashcardContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    width: '100%',
+  },
+  flashcardLabel: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Medium',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 12,
+    opacity: 0.8,
+  },
+  flashcardText: {
+    fontSize: 20,
+    fontFamily: 'Mulish-Bold',
+    textAlign: 'center',
+    lineHeight: 28,
+    paddingHorizontal: 10,
+  },
+  flashcardControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  controlButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    maxWidth: screenWidth * 0.5,
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 3,
+  },
+  emptyFlashcard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyFlashcardText: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Regular',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  // Pronunciation button styles
+  pronunciationButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 100,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  // List item pronunciation styles
+  flashcardTextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  flashcardTexts: {
+    flex: 1,
+  },
+  listPronunciationButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
 }); 

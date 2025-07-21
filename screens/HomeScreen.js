@@ -228,7 +228,7 @@ const SimpleLeaderboard = ({ theme, navigation }) => {
   const fetchLeaderboard = async () => {
     try {
       setLoading(true);
-      const response = await userService.getLeaderboard(3);
+      const response = await userService.getLeaderboard({ limit: 3 });
       const result = apiUtils.parseResponse(response);
       if (result.data && Array.isArray(result.data)) {
         setTop3(result.data.slice(0, 3));
