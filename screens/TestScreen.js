@@ -1,122 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Card, Button, Overlay } from 'react-native-elements';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { createGlobalStyles } from '../utils/globalStyles';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { testsAPI, apiUtils } from '../services';
+import { testService, apiUtils } from '../services';
 
-const TestItem = ({ test, isReadOnly = true }) => {
-  const [showAnswer, setShowAnswer] = useState(false);
-
-  const toggleAnswer = () => {
-    setShowAnswer(!showAnswer);
-  };
-
-  return (
-    <View style={testItemStyles.container}>
-      <View style={testItemStyles.questionContainer}>
-        <Text style={testItemStyles.questionText}>{test.question}</Text>
-      </View>
-      <View style={testItemStyles.optionsContainer}>
-        {test.options && test.options.map((option, index) => (
-          <View
-            key={index}
-            style={[
-              testItemStyles.optionButton,
-              test.correctAnswer === option && testItemStyles.correctOption,
-            ]}
-          >
-            <Text style={{ color: '#fff', flex: 1 }}>{option}</Text>
-            {test.correctAnswer === option && (
-              <Ionicons name="checkmark-circle" size={20} color="#28a745" />
-            )}
-          </View>
-        ))}
-      </View>
-      {isReadOnly && (
-        <TouchableOpacity onPress={toggleAnswer} style={{ marginTop: 10 }}>
-          <Text style={{ color: '#4CC2FF', textAlign: 'center' }}>
-            {showAnswer ? 'Hide Answer' : 'Show Answer'}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-};
-
-const testItemStyles = StyleSheet.create({
-  container: {
-    marginBottom: 15,
-    padding: 15,
-    backgroundColor: '#333',
-    borderRadius: 8,
-  },
-  questionContainer: {
-    marginBottom: 15,
-  },
-  questionText: {
-    fontSize: 16,
-    fontFamily: 'Mulish-Bold',
-    color: '#fff',
-    lineHeight: 22,
-  },
-  optionsContainer: {
-    marginTop: 10,
-  },
-  optionButton: {
-    backgroundColor: '#555',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  correctOption: {
-    backgroundColor: '#28a745',
-    borderColor: '#28a745',
-    borderWidth: 2,
-  },
-});
-
-const TestScreen = ({ route, navigation }) => {
+const TestScreen = ({ route }) => {
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedTestIndex, setSelectedTestIndex] = useState(0);
-  const { userToken } = useAuth();
+
+  const navigation = useNavigation();
+  const { user } = useAuth();
+  const { theme } = useTheme();
   const { showError } = useToast();
+  const globalStyles = createGlobalStyles(theme);
 
-  const openModal = (index) => {
-    setSelectedTestIndex(index);
-    setModalVisible(true);
-  };
-
-  const closeModal = () => setModalVisible(false);
-
-  const fetchTests = async () => {
-    setLoading(true);
+  const fetchTests = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
+    
     try {
-      const response = await testsAPI.getCourseTests(route.params?.courseId || 'default');
+      const response = await testService.getCourseTests(route.params?.courseId || 'default');
       const result = apiUtils.parseResponse(response);
 
       if (result.data && Array.isArray(result.data)) {
         setTests(result.data);
       } else {
         setTests([]);
-        showError('Data Error', 'No tests found for this course.');
+        showError('No tests found for this course.');
       }
     } catch (err) {
       const errorInfo = apiUtils.handleError(err);
       setError(errorInfo.message);
       setTests([]);
+      showError('Failed to load tests');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -124,37 +54,77 @@ const TestScreen = ({ route, navigation }) => {
     fetchTests();
   }, []);
 
-  const renderModalContent = () => {
-    if (tests.length === 0) return null;
-
-    const test = tests[selectedTestIndex];
-    return (
-      <View style={styles.modalContent}>
-        <View style={styles.modalNavRow}>
-          <TouchableOpacity onPress={closeModal}>
-            <Ionicons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>Test {selectedTestIndex + 1}</Text>
-          <View style={styles.modalNavSpacer} />
-        </View>
-        <View style={styles.modalBody}>
-          <TestItem test={test} isReadOnly={true} />
-        </View>
-        <Button
-          title="Take Test"
-          buttonStyle={styles.closeModalButton}
-          titleStyle={{ color: '#fff', fontFamily: 'Mulish-Bold' }}
-          onPress={() => {
-            closeModal();
-            navigation.navigate('TestScreenDetail', { 
-              testId: test._id, 
-              testName: test.name || `Test ${selectedTestIndex + 1}` 
-            });
-          }}
-        />
-      </View>
-    );
+  const onRefresh = () => {
+    fetchTests(true);
   };
+
+  const renderTestItem = ({ item, index }) => (
+    <TouchableOpacity
+      style={[styles.testItem, { 
+        backgroundColor: theme.colors.cardBackground, 
+        borderColor: theme.colors.borderColor 
+      }]}
+      onPress={() => navigation.navigate('TestScreenDetail', { 
+        testId: item._id, 
+        testName: item.name || `Test ${index + 1}` 
+      })}
+      activeOpacity={0.7}
+    >
+      <View style={styles.testItemContent}>
+        <View style={styles.testItemLeft}>
+          <Ionicons name="document-text" size={20} color={theme.colors.primary} />
+          <View style={styles.testInfo}>
+            <Text style={[styles.testName, { color: theme.colors.text }]}>
+              {item.name || `Test ${index + 1}`}
+            </Text>
+            <Text style={[styles.testDescription, { color: theme.colors.textSecondary }]}>
+              Final assessment for the course
+            </Text>
+          </View>
+        </View>
+        
+        <View style={styles.testItemRight}>
+          {/* TODO: Add completion status badge when user test data is available */}
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderHeader = () => (
+    <View style={[styles.header, { backgroundColor: theme.colors.cardBackground }]}>
+      <View style={styles.headerTop}>
+        <TouchableOpacity
+          style={[styles.backButton, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <View style={styles.titleContainer}>
+          <Text style={[globalStyles.title, styles.headerTitle, { color: theme.colors.text }]}>
+            Course Tests
+          </Text>
+        </View>
+        <View style={styles.headerSpacer} />
+      </View>
+      
+      <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
+        Test your knowledge with interactive assessments
+      </Text>
+    </View>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="document-text-outline" size={64} color={theme.colors.textMuted} />
+      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+        No tests available
+      </Text>
+      <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+        Check back later for new tests to assess your knowledge.
+      </Text>
+    </View>
+  );
 
   if (loading) {
     return <LoadingSpinner fullScreen text="Loading tests..." />;
@@ -162,81 +132,53 @@ const TestScreen = ({ route, navigation }) => {
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={50} color="#ff6b6b" />
-        <Text style={styles.errorText}>{error}</Text>
-        <Button
-          title="Retry"
-          onPress={fetchTests}
-          buttonStyle={styles.retryButton}
-          titleStyle={styles.retryButtonText}
-        />
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        {renderHeader()}
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color="#ff6b6b" />
+          <Text style={[styles.errorTitle, { color: theme.colors.text }]}>
+            Oops! Something went wrong
+          </Text>
+          <Text style={[styles.errorText, { color: theme.colors.textSecondary }]}>
+            {error}
+          </Text>
+          <TouchableOpacity 
+            style={[styles.retryButton, { backgroundColor: theme.colors.primary }]} 
+            onPress={() => fetchTests()}
+          >
+            <Ionicons name="refresh" size={20} color={theme.colors.buttonText} />
+            <Text style={[styles.retryButtonText, { color: theme.colors.buttonText }]}>
+              Try Again
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Course Tests</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
-      <ScrollView style={styles.contentContainer} contentContainerStyle={styles.contentScrollContainer}>
-        <Card containerStyle={styles.card}>
-          <Card.Title style={styles.cardTitle}>Available Tests</Card.Title>
-          <Text style={styles.description}>
-            Test your knowledge with these interactive quizzes. Each test contains multiple-choice questions to help you assess your understanding of the course material.
-          </Text>
-
-          {tests.length > 0 ? (
-            <View style={styles.testsSection}>
-              <Text style={styles.sectionTitle}>Select a Test</Text>
-              <View style={styles.chipRow}>
-                {tests.map((test, index) => (
-                  <Button
-                    key={test._id || index}
-                    title={`Test ${index + 1}`}
-                    type="outline"
-                    buttonStyle={styles.chipButton}
-                    titleStyle={styles.chipTitle}
-                    onPress={() => openModal(index)}
-                  />
-                ))}
-              </View>
-              <Button
-                title="Take Test"
-                buttonStyle={{ backgroundColor: '#28a745', borderRadius: 8, marginTop: 20 }}
-                titleStyle={{ color: '#fff', fontFamily: 'Mulish-Bold' }}
-                onPress={() => navigation.navigate('TestScreenDetail', { testId: tests[0]._id, testName: tests[0].name })}
-              />
-            </View>
-          ) : (
-            <View style={styles.noTestsContainer}>
-              <Ionicons name="document-text-outline" size={50} color="#888" />
-              <Text style={styles.noTestsText}>No tests available for this course yet.</Text>
-            </View>
-          )}
-        </Card>
-
-        <Overlay
-          isVisible={modalVisible}
-          onBackdropPress={closeModal}
-          overlayStyle={styles.modalOverlay}
-          fullScreen={false}
-        >
-          <ScrollView
-            style={styles.modalScrollView}
-            contentContainerStyle={styles.modalScrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {renderModalContent()}
-          </ScrollView>
-        </Overlay>
-      </ScrollView>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      {renderHeader()}
+      
+      {tests.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <FlatList
+          data={tests}
+          keyExtractor={(item, index) => item._id || index.toString()}
+          renderItem={renderTestItem}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 };
@@ -244,181 +186,141 @@ const TestScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1D1D1D',
+    overflow: 'hidden',
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: '#181818',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 10,
+    backgroundColor: 'rgba(76, 194, 255, 0.1)',
   },
   backButton: {
     padding: 8,
+    borderRadius: 8,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: 'Mulish-Bold',
-    color: '#fff',
-    flex: 1,
-    textAlign: 'center',
   },
   headerSpacer: {
     width: 40,
+    height: 40,
   },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  contentScrollContainer: {
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
     flexGrow: 1,
   },
-  card: {
-    borderRadius: 10,
-    margin: 10,
-    padding: 15,
-    backgroundColor: '#2a2a2a',
-    borderColor: '#333',
+  testItem: {
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  cardTitle: {
+  testItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    minHeight: 68,
+  },
+  testItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  testInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  testName: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+    marginBottom: 4,
+  },
+  testDescription: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Regular',
+    lineHeight: 18,
+  },
+  testItemRight: {
+    marginLeft: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 64,
+  },
+  emptyTitle: {
     fontSize: 20,
     fontFamily: 'Mulish-Bold',
-    color: '#fff',
     textAlign: 'center',
-  },
-  description: {
-    fontSize: 14,
-    marginBottom: 15,
-    color: '#ccc',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  testsSection: {
-    marginTop: 15,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Mulish-Bold',
-    color: '#bbb',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chipButton: {
-    marginRight: 8,
+    marginTop: 16,
     marginBottom: 8,
-    backgroundColor: '#007AFF',
   },
-  chipTitle: {
-    color: '#fff',
-    fontFamily: 'Mulish-Bold',
-  },
-  noTestsContainer: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  noTestsText: {
-    color: '#ccc',
+  emptyText: {
     fontSize: 16,
-    marginTop: 10,
+    fontFamily: 'Mulish-Regular',
     textAlign: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  },
-  loadingText: {
-    color: '#007AFF',
-    marginTop: 10,
+    lineHeight: 24,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 20,
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontFamily: 'Mulish-Bold',
+    textAlign: 'center',
   },
   errorText: {
-    color: '#ff6b6b',
     fontSize: 16,
-    marginBottom: 20,
+    fontFamily: 'Mulish-Regular',
     textAlign: 'center',
+    lineHeight: 24,
   },
   retryButton: {
-    backgroundColor: '#007bff',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Mulish-Bold',
-  },
-  modalOverlay: {
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    borderRadius: 16,
-    padding: 20,
-    backgroundColor: '#222',
-    alignSelf: 'center',
-  },
-  modalScrollView: {
-    flex: 1,
-    maxHeight: '100%',
-  },
-  modalScrollContent: {
-    flexGrow: 1,
-    paddingBottom: 20,
-  },
-  modalContent: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  modalNavRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 10,
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
   },
-  modalNavSpacer: {
-    width: 32,
-  },
-  modalTitle: {
-    fontSize: 18,
+  retryButtonText: {
+    fontSize: 16,
     fontFamily: 'Mulish-Bold',
-    color: '#fff',
-    flex: 1,
-    textAlign: 'center',
-    paddingHorizontal: 10,
-  },
-  modalBody: {
-    marginBottom: 15,
-    width: '100%',
-    paddingHorizontal: 10,
-  },
-  closeModalButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    marginTop: 10,
   },
 });
 

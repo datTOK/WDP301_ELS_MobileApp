@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -147,15 +148,20 @@ export default function MembershipScreen() {
   const headerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fetchMemberships();
-    
-    // Animate header
+    // Animate header on mount
     Animated.timing(headerAnim, {
       toValue: 1,
       duration: 800,
       useNativeDriver: true,
     }).start();
   }, []);
+
+  // Fetch memberships when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchMemberships();
+    }, [])
+  );
 
   const fetchMemberships = async () => {
     try {
@@ -223,6 +229,7 @@ export default function MembershipScreen() {
         <Animated.View
           style={[
             localStyles.header,
+            { backgroundColor: theme.colors.cardBackground },
             {
               opacity: headerAnim,
               transform: [
@@ -236,12 +243,19 @@ export default function MembershipScreen() {
             },
           ]}
         >
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Membership Plans
-          </Text>
-          <Text style={[styles.bodyText, { color: theme.colors.textSecondary }]}>
-            Choose the perfect plan to enhance your English learning experience
-          </Text>
+          <View style={localStyles.headerContent}>
+            <View>
+              <View style={localStyles.titleContainer}>
+                <Ionicons name="diamond-outline" size={28} color="#10b981" style={localStyles.titleIcon} />
+                <Text style={[styles.title, { color: theme.colors.text, marginBottom: 0 }]}>
+                  Membership Plans
+                </Text>
+              </View>
+              <Text style={[styles.bodyText, { color: theme.colors.textSecondary }]}>
+                Choose the perfect plan to enhance your learning
+              </Text>
+            </View>
+          </View>
         </Animated.View>
 
         {/* Error State */}
@@ -293,9 +307,28 @@ const localStyles = StyleSheet.create({
     paddingBottom: 20,
   },
   header: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1D1D1D',
+    overflow: 'hidden',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 30,
+    padding: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleIcon: {
+    marginRight: 12,
   },
   membershipContainer: {
     paddingHorizontal: 16,

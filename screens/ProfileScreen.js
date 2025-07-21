@@ -30,14 +30,11 @@ export default function ProfileScreen({ navigation }) {
   const styles = createGlobalStyles(theme);
 
   const fetchProfileData = async () => {
-    console.log('=== ProfileScreen: Starting fetchProfileData ===');
     setLoading(true);
     setError(null);
     try {
       // Refresh user profile from API
-      console.log('Calling fetchAndSetUserProfile with token...');
       await fetchAndSetUserProfile(userToken);
-      console.log('fetchAndSetUserProfile completed');
       
       // Note: After fetchAndSetUserProfile, the user state should be updated
       // We'll fetch stats in the separate useEffect that watches for user changes
@@ -46,7 +43,6 @@ export default function ProfileScreen({ navigation }) {
       const errorInfo = apiUtils.handleError(err);
       setError(errorInfo.message);
     } finally {
-      console.log('=== ProfileScreen: fetchProfileData completed ===');
       setLoading(false);
       setRefreshing(false);
     }
@@ -65,9 +61,7 @@ export default function ProfileScreen({ navigation }) {
       // Only fetch user stats if we have a user ID
       const fetchUserStats = async () => {
         try {
-          console.log('User changed, fetching stats for user ID:', user._id);
           const userDetail = await userService.getUserDetailById(user._id);
-          console.log('User stats received:', userDetail);
           setUserStats(userDetail);
         } catch (statsError) {
           console.error('Error fetching user stats:', statsError);

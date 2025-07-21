@@ -62,26 +62,20 @@ class UserService {
       const userDetail = { ...user };
 
       // Try to get additional stats from various endpoints
-      console.log('Fetching user courses...');
       const userCoursesResponse = await api.get(`/api/user-courses/${userId}/user`).catch((error) => {
         console.error('Error fetching user courses:', error);
         return { data: null };
       });
-      console.log('User courses response:', userCoursesResponse);
 
-      console.log('Fetching user tests...');
       const userTestsResponse = await api.get(`/api/user-tests/${userId}/user`).catch((error) => {
         console.error('Error fetching user tests:', error);
         return { data: null };
       });
-      console.log('User tests response:', userTestsResponse);
 
-      console.log('Fetching user achievements...');
       const userAchievementsResponse = await api.get(`/api/user-achievements/${userId}/users`).catch((error) => {
         console.error('Error fetching user achievements:', error);
         return { data: null };
       });
-      console.log('User achievements response:', userAchievementsResponse);
 
       // Process courses data
       if (userCoursesResponse?.data) {

@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
@@ -228,17 +228,21 @@ export default function BlogScreen() {
 
   const headerAnim = useRef(new Animated.Value(0)).current;
 
-  // Fetch blogs when component mounts
+  // Animate header when component mounts
   useEffect(() => {
-    fetchBlogs(false, '');
-    
-    // Animate header
     Animated.timing(headerAnim, {
       toValue: 1,
       duration: 800,
       useNativeDriver: true,
     }).start();
   }, []);
+
+  // Fetch blogs when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchBlogs(false, '');
+    }, [])
+  );
 
   const fetchBlogs = useCallback(async (resetPage = false, searchTerm = null) => {
     if (resetPage) {
@@ -312,6 +316,7 @@ export default function BlogScreen() {
       <Animated.View
         style={[
           styles.header,
+          { backgroundColor: theme.colors.cardBackground },
           {
             opacity: headerAnim,
             transform: [
@@ -325,12 +330,19 @@ export default function BlogScreen() {
           },
         ]}
       >
-        <Text style={[globalStyles.title, { color: theme.colors.text }]}>
-          Blog & Articles
-        </Text>
-        <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
-          Discover insights and tips for your English learning journey
-        </Text>
+        <View style={styles.headerContent}>
+          <View>
+            <View style={styles.titleContainer}>
+              <Ionicons name="document-text-outline" size={28} color="#4CC2FF" style={styles.titleIcon} />
+              <Text style={[globalStyles.title, { color: theme.colors.text, marginBottom: 0 }]}>
+                Blog & Articles
+              </Text>
+            </View>
+            <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
+              Discover insights and tips for your learning journey
+            </Text>
+          </View>
+        </View>
       </Animated.View>
 
       {/* Search Header */}
@@ -408,10 +420,28 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   header: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1D1D1D',
+    overflow: 'hidden',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    padding: 16,
+    backgroundColor: 'rgba(76, 194, 255, 0.1)',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleIcon: {
+    marginRight: 12,
   },
   searchContainer: {
     marginHorizontal: 16,

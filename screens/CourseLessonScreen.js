@@ -79,7 +79,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
             status: "not_started",
           };
         } catch (error) {
-          console.log("Error fetching user lesson status:", error);
+          // Error fetching user lesson status - return default state
           return {
             lessonId: lesson._id,
             completed: false,

@@ -51,7 +51,14 @@ export default function CreateFlashcardSetScreen() {
       showSuccess('Flashcard set created successfully!');
       
       // Navigate to the new flashcard set detail
-      navigation.replace('FlashcardSetDetail', { setId: result.flashcardSet._id });
+      const flashcardSetId = result.data?.flashcardSet?._id;
+      if (flashcardSetId) {
+        navigation.replace('FlashcardSetDetail', { setId: flashcardSetId });
+      } else {
+        // Fallback: go back to flashcard sets list if no ID found
+        console.error('No flashcard set ID found in response:', result);
+        navigation.goBack();
+      }
     } catch (err) {
       console.error('Error creating flashcard set:', err);
       const errorInfo = apiUtils.handleError(err);

@@ -13,14 +13,13 @@ import {
 import { Card, Button, SearchBar } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { createGlobalStyles } from '../utils/globalStyles';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { flashcardService, apiUtils } from '../services';
 
-const FlashcardSetCard = ({ flashcardSet, navigation, theme, showOwnerInfo = true }) => {
+const FlashcardSetCard = ({ flashcardSet, navigation, theme }) => {
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -80,23 +79,21 @@ const FlashcardSetCard = ({ flashcardSet, navigation, theme, showOwnerInfo = tru
           </View>
 
           {/* Meta Information */}
-          {showOwnerInfo && (
-            <View style={styles.setMeta}>
-              <View style={styles.authorInfo}>
-                <Ionicons name="person-outline" size={14} color={theme.colors.textMuted} />
-                <Text style={[styles.authorText, { color: theme.colors.textMuted }]}>
-                  {flashcardSet.user?.username || 'Anonymous'}
-                </Text>
-              </View>
-              
-              <View style={styles.dateInfo}>
-                <Ionicons name="calendar-outline" size={14} color={theme.colors.textMuted} />
-                <Text style={[styles.dateText, { color: theme.colors.textMuted }]}>
-                  {formatDate(flashcardSet.createdAt)}
-                </Text>
-              </View>
+          <View style={styles.setMeta}>
+            <View style={styles.authorInfo}>
+              <Ionicons name="person-outline" size={14} color={theme.colors.textMuted} />
+              <Text style={[styles.authorText, { color: theme.colors.textMuted }]}>
+                {flashcardSet.user?.username || 'Anonymous'}
+              </Text>
             </View>
-          )}
+            
+            <View style={styles.dateInfo}>
+              <Ionicons name="calendar-outline" size={14} color={theme.colors.textMuted} />
+              <Text style={[styles.dateText, { color: theme.colors.textMuted }]}>
+                {formatDate(flashcardSet.createdAt)}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Study Button */}
@@ -126,10 +123,9 @@ export default function FlashcardSetsScreen() {
   const [sortBy, setSortBy] = useState("date");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [viewMode, setViewMode] = useState("all"); // "all" or "mine"
+
 
   const navigation = useNavigation();
-  const { userToken, user } = useAuth();
   const { theme } = useTheme();
   const { showError } = useToast();
   const globalStyles = createGlobalStyles(theme);
@@ -147,7 +143,6 @@ export default function FlashcardSetsScreen() {
     setError(null);
     
     try {
-      let response;
       const params = {
         page,
         size,
@@ -156,14 +151,8 @@ export default function FlashcardSetsScreen() {
         ...(debouncedSearch && { search: debouncedSearch }),
       };
 
-      if (viewMode === "mine" && user?._id) {
-        // Get user's own flashcard sets
-        response = await flashcardService.getUserFlashcardSets(user._id, params);
-      } else {
-        // Get all flashcard sets
-        response = await flashcardService.getFlashcardSets(params);
-      }
-      
+      // Get all flashcard sets
+      const response = await flashcardService.getFlashcardSets(params);
       const result = apiUtils.parseResponse(response);
 
       if (result.data && Array.isArray(result.data)) {
@@ -185,20 +174,20 @@ export default function FlashcardSetsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [page, size, order, sortBy, debouncedSearch, viewMode, user?._id]);
+  }, [page, size, order, sortBy, debouncedSearch]);
 
   useEffect(() => {
     fetchFlashcardSets();
   }, [fetchFlashcardSets]);
 
-  // Reset to "All Sets" view when screen is focused (e.g., from tab navigation)
+  // Fetch data when screen is focused
   useFocusEffect(
     useCallback(() => {
-      setViewMode("all");
       setPage(1);
       setSearch("");
       setDebouncedSearch("");
-    }, [])
+      fetchFlashcardSets();
+    }, [fetchFlashcardSets])
   );
 
   const handleNextPage = () => {
@@ -235,18 +224,24 @@ export default function FlashcardSetsScreen() {
       flashcardSet={item}
       navigation={navigation}
       theme={theme}
-      showOwnerInfo={viewMode === "all"}
     />
   );
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-        Flashcard Sets
-      </Text>
-      <Text style={[styles.headerSubtitle, { color: theme.colors.textSecondary }]}>
-        {total} flashcard set{total !== 1 ? "s" : ""} available
-      </Text>
+    <View style={[styles.header, { backgroundColor: theme.colors.cardBackground }]}>
+      <View style={styles.headerContent}>
+        <View>
+          <View style={styles.titleContainer}>
+            <Ionicons name="layers-outline" size={28} color="#4CC2FF" style={styles.titleIcon} />
+            <Text style={[globalStyles.title, { color: theme.colors.text, marginBottom: 0 }]}>
+              Flashcard Sets
+            </Text>
+          </View>
+          <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
+            {total} flashcard set{total !== 1 ? "s" : ""} ready for study
+          </Text>
+        </View>
+      </View>
     </View>
   );
 
@@ -287,29 +282,6 @@ export default function FlashcardSetsScreen() {
 
       {/* Filters */}
       <View style={styles.filtersContainer}>
-        {/* View Mode Filter */}
-        <View style={styles.filterGroup}>
-          <Text style={[styles.filterLabel, { color: theme.colors.textSecondary }]}>View</Text>
-          <View style={styles.filterRow}>
-            <FilterButton
-              title="All Sets"
-              isActive={viewMode === "all"}
-              onPress={() => {
-                setViewMode("all");
-                setPage(1);
-              }}
-            />
-            <FilterButton
-              title="My Sets"
-              isActive={viewMode === "mine"}
-              onPress={() => {
-                setViewMode("mine");
-                setPage(1);
-              }}
-            />
-          </View>
-        </View>
-
         {/* Sort By Filter */}
         <View style={styles.filterGroup}>
           <Text style={[styles.filterLabel, { color: theme.colors.textSecondary }]}>Sort by</Text>
@@ -423,12 +395,10 @@ export default function FlashcardSetsScreen() {
     <View style={styles.emptyContainer}>
       <Ionicons name="layers-outline" size={64} color={theme.colors.textMuted} />
       <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
-        {viewMode === "mine" ? "No flashcard sets found" : "No flashcard sets available"}
+        No flashcard sets available
       </Text>
       <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-        {viewMode === "mine" 
-          ? "Create your first flashcard set to start learning!"
-          : search
+        {search
           ? "Try adjusting your search terms"
           : "Check back later for new flashcard sets"
         }
@@ -488,22 +458,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#202020',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-    backgroundColor: '#202020',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1D1D1D',
+    overflow: 'hidden',
   },
-  headerTitle: {
-    fontSize: 32,
-    fontFamily: 'Mulish-Bold',
-    color: '#fff',
-    letterSpacing: -0.5,
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(76, 194, 255, 0.1)',
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#aaa',
-    marginTop: 4,
-    fontFamily: 'Mulish-Medium',
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleIcon: {
+    marginRight: 12,
   },
   controlsContainer: {
     backgroundColor: '#2a2a2a',
@@ -518,11 +494,13 @@ const styles = StyleSheet.create({
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
     marginBottom: 20,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
+    minWidth: 140,
   },
   createButtonText: {
     fontSize: 14,
@@ -561,7 +539,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  filterRow: {
+    filterRow: {
     flexDirection: 'row',
     gap: 8,
   },

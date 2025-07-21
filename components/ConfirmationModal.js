@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { globalStyles } from '../utils/globalStyles';
+import { createGlobalStyles } from '../utils/globalStyles';
 
 const { width } = Dimensions.get('window');
 
@@ -19,6 +19,7 @@ const ConfirmationModal = ({
   cancelButtonStyle,
 }) => {
   const { theme } = useTheme();
+  const globalStyles = createGlobalStyles(theme);
 
   const getVariantStyles = () => {
     switch (variant) {
@@ -66,11 +67,11 @@ const ConfirmationModal = ({
             />
           </View>
           
-          <Text style={[styles.title, globalStyles.title, { color: theme.colors.text }]}>
+          <Text style={[styles.title, globalStyles.subtitle, { color: theme.colors.text }]}>
             {title}
           </Text>
           
-          <Text style={[styles.message, globalStyles.text, { color: theme.colors.textSecondary }]}>
+          <Text style={[styles.message, globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
             {message}
           </Text>
           
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Mulish-SemiBold',
   },
 });
 

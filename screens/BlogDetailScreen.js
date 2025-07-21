@@ -33,15 +33,11 @@ export default function BlogDetailScreen({ route, navigation }) {
     }
 
     try {
-      console.log('Fetching blog with ID:', blogId);
       const response = await blogService.getBlogById(blogId);
-      console.log('Raw API response:', response);
       
       const result = apiUtils.parseResponse(response);
-      console.log('Parsed result:', result);
 
       if (result.data) {
-        console.log('Blog data received:', result.data);
         // Check if the blog data is in result.data.blog (from API response structure)
         const blogData = result.data.blog || result.data;
         console.log('Extracted blog data:', blogData);

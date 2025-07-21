@@ -7,6 +7,7 @@ import * as Font from 'expo-font';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ConfirmationProvider } from './context/ConfirmationContext';
 import Navigator from './navigation/Navigator';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -27,6 +28,10 @@ import MembershipScreen from './screens/MembershipScreen';
 import BlogScreen from './screens/BlogScreen';
 import BlogDetailScreen from './screens/BlogDetailScreen';
 import AchievementScreen from './screens/AchievementScreen';
+import FlashcardSetsScreen from './screens/FlashcardSetsScreen';
+import FlashcardSetDetailScreen from './screens/FlashcardSetDetailScreen';
+import MyFlashcardSetsScreen from './screens/MyFlashcardSetsScreen';
+import CreateFlashcardSetScreen from './screens/CreateFlashcardSetScreen';
 
 const Stack = createStackNavigator();
 
@@ -74,37 +79,45 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <ToastProvider>
-          <NavigationContainer>
-            <StatusBar style="light" />
-            <Stack.Navigator
-              initialRouteName="Login"
-              screenOptions={{
-                headerShown: false,
-                cardStyle: { backgroundColor: '#202020' },
-              }}
-            >
-              {/* Auth Screens */}
-              <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="Signup" component={SignupScreen} />
-              <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
-              
-              {/* Main App Screens */}
-              <Stack.Screen name="Main" component={Navigator} />
-              <Stack.Screen name="Home" component={HomeScreen} />
-              <Stack.Screen name="Courses" component={CoursesScreen} />
-              <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
-              <Stack.Screen name="CourseOverview" component={CourseOverviewScreen} />
-              <Stack.Screen name="CourseLesson" component={CourseLessonScreen} />
-              <Stack.Screen name="Test" component={TestScreen} />
-              <Stack.Screen name="TestScreenDetail" component={TestScreenDetail} />
-              <Stack.Screen name="Profile" component={ProfileScreen} />
-              <Stack.Screen name="MyCourses" component={MyCoursesScreen} />
-              <Stack.Screen name="Membership" component={MembershipScreen} />
-              <Stack.Screen name="Blog" component={BlogScreen} />
-              <Stack.Screen name="BlogDetail" component={BlogDetailScreen} />
-              <Stack.Screen name="Achievement" component={AchievementScreen} />
-            </Stack.Navigator>
-          </NavigationContainer>
+          <ConfirmationProvider>
+            <NavigationContainer>
+              <StatusBar style="light" />
+              <Stack.Navigator
+                initialRouteName="Login"
+                screenOptions={{
+                  headerShown: false,
+                  cardStyle: { backgroundColor: '#202020' },
+                }}
+              >
+                {/* Auth Screens */}
+                <Stack.Screen name="Login" component={LoginScreen} />
+                <Stack.Screen name="Signup" component={SignupScreen} />
+                <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+                
+                {/* Main App Screens */}
+                <Stack.Screen name="Main" component={Navigator} />
+                <Stack.Screen name="Home" component={HomeScreen} />
+                <Stack.Screen name="Courses" component={CoursesScreen} />
+                <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
+                <Stack.Screen name="CourseOverview" component={CourseOverviewScreen} />
+                <Stack.Screen name="CourseLesson" component={CourseLessonScreen} />
+                <Stack.Screen name="Test" component={TestScreen} />
+                <Stack.Screen name="TestScreenDetail" component={TestScreenDetail} />
+                <Stack.Screen name="Profile" component={ProfileScreen} />
+                <Stack.Screen name="MyCourses" component={MyCoursesScreen} />
+                <Stack.Screen name="Membership" component={MembershipScreen} />
+                <Stack.Screen name="Blog" component={BlogScreen} />
+                <Stack.Screen name="BlogDetail" component={BlogDetailScreen} />
+                <Stack.Screen name="Achievement" component={AchievementScreen} />
+                
+                {/* Flashcard Screens */}
+                <Stack.Screen name="FlashcardSets" component={FlashcardSetsScreen} />
+                <Stack.Screen name="FlashcardSetDetail" component={FlashcardSetDetailScreen} />
+                <Stack.Screen name="MyFlashcardSets" component={MyFlashcardSetsScreen} />
+                <Stack.Screen name="CreateFlashcardSet" component={CreateFlashcardSetScreen} />
+              </Stack.Navigator>
+            </NavigationContainer>
+          </ConfirmationProvider>
         </ToastProvider>
       </AuthProvider>
     </ThemeProvider>

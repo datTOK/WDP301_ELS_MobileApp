@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -15,9 +16,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { SearchBar } from "react-native-elements";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { createGlobalStyles } from "../utils/globalStyles";
 import { courseService, apiUtils } from "../services";
 
 const { width } = Dimensions.get("window");
@@ -185,7 +188,9 @@ export default function CoursesScreen({ navigation }) {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const { userToken } = useAuth();
+  const { theme } = useTheme();
   const { showError } = useToast();
+  const globalStyles = createGlobalStyles(theme);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -229,9 +234,12 @@ export default function CoursesScreen({ navigation }) {
     }
   }, [page, size, order, sortBy, debouncedSearch, showError]);
 
-  useEffect(() => {
-    fetchCourses();
-  }, [fetchCourses]);
+  // Fetch courses when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchCourses();
+    }, [fetchCourses])
+  );
 
   const handleNextPage = () => {
     if (page < totalPages) setPage((prev) => prev + 1);
@@ -328,11 +336,20 @@ export default function CoursesScreen({ navigation }) {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Courses</Text>
-        <Text style={styles.headerSubtitle}>
-          {total} course{total !== 1 ? "s" : ""} available
-        </Text>
+      <View style={[styles.header, { backgroundColor: theme.colors.cardBackground }]}>
+        <View style={styles.headerContent}>
+          <View>
+            <View style={styles.titleContainer}>
+              <Ionicons name="library-outline" size={28} color="#4CC2FF" style={styles.titleIcon} />
+              <Text style={[globalStyles.title, { color: theme.colors.text, marginBottom: 0 }]}>
+                Courses
+              </Text>
+            </View>
+            <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
+              {total} course{total !== 1 ? "s" : ""} available for learning
+            </Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.controlsContainer}>
@@ -453,22 +470,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#202020",
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-    backgroundColor: "#202020",
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1D1D1D',
+    overflow: 'hidden',
   },
-  headerTitle: {
-    fontSize: 32,
-    fontFamily: 'Mulish-Bold',
-    color: "#fff",
-    letterSpacing: -0.5,
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(76, 194, 255, 0.1)',
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: "#aaa",
-    marginTop: 4,
-    fontFamily: 'Mulish-Medium',
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleIcon: {
+    marginRight: 12,
   },
   controlsContainer: {
     backgroundColor: "#2a2a2a",

@@ -37,7 +37,6 @@ export default function AchievementScreen() {
   const fetchAchievements = async (isRefresh = false) => {
     try {
       if (!user?._id) {
-        console.log('No userId available, skipping achievement fetch');
         return;
       }
 

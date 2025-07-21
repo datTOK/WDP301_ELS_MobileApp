@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
@@ -24,9 +25,12 @@ export default function LeaderboardScreen() {
   const { showError } = useToast();
   const globalStyles = createGlobalStyles(theme);
 
-  useEffect(() => {
-    fetchLeaderboard();
-  }, []);
+  // Fetch leaderboard when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchLeaderboard();
+    }, [])
+  );
 
   const fetchLeaderboard = async (isRefresh = false) => {
     try {
@@ -36,12 +40,7 @@ export default function LeaderboardScreen() {
       
       const response = await userService.getLeaderboard({ limit: 10 });
       
-      // Add debugging information
-      console.log('Leaderboard response:', response);
-      
       const result = apiUtils.parseResponse(response);
-      
-      console.log('Parsed result:', result);
       
       // The backend returns users array directly in the response
       if (result.data && result.data.users && Array.isArray(result.data.users)) {
@@ -135,24 +134,16 @@ export default function LeaderboardScreen() {
     <View style={[styles.header, { backgroundColor: theme.colors.cardBackground }]}>
       <View style={styles.headerContent}>
         <View>
-          <Text style={[globalStyles.title, { color: theme.colors.text }]}>
-            🏆 Leaderboard
-          </Text>
+          <View style={styles.titleContainer}>
+            <Ionicons name="trophy" size={28} color="#FBBF24" style={styles.titleIcon} />
+            <Text style={[globalStyles.title, { color: theme.colors.text, marginBottom: 0 }]}>
+              Leaderboard
+            </Text>
+          </View>
           <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
             Top performers in our community
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={onRefresh}
-          disabled={refreshing}
-          style={[styles.refreshButton, { opacity: refreshing ? 0.5 : 1 }]}
-        >
-          <Ionicons 
-            name="refresh" 
-            size={20} 
-            color={theme.colors.primary} 
-          />
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -441,5 +432,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
     paddingHorizontal: 20,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleIcon: {
+    marginRight: 12,
   },
 }); 

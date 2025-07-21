@@ -220,6 +220,160 @@ const FeatureCard = ({ icon, title, description, theme, delay = 0 }) => {
   );
 };
 
+// Blog Card Component (matching BlogScreen design)
+const HomeBlogCard = ({ blog, navigation, theme, index }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 500,
+        delay: index * 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [index]);
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'published':
+        return theme.colors.primary;
+      case 'draft':
+      case 'drafting':
+        return theme.colors.textMuted;
+      case 'archived':
+        return theme.colors.error;
+      default:
+        return theme.colors.textSecondary;
+    }
+  };
+
+  return (
+    <Animated.View
+      style={[
+        styles.homeBlogCard,
+        {
+          backgroundColor: theme.colors.cardBackground,
+          borderColor: theme.colors.borderColor,
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={() => navigation.navigate('BlogDetail', { blogId: blog._id })}
+        activeOpacity={0.8}
+        style={styles.homeBlogCardTouchable}
+      >
+        {/* Cover Image or Placeholder */}
+        <View style={styles.homeBlogImageContainer}>
+          {blog.coverImage ? (
+            <Image
+              source={{ uri: blog.coverImage }}
+              style={styles.homeBlogCoverImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.homeBlogImagePlaceholder, { backgroundColor: theme.colors.surfaceBackground }]}>
+              <Text style={[styles.homeBlogImagePlaceholderText, { color: theme.colors.primary }]}>
+                {blog.title?.charAt(0)?.toUpperCase() || 'B'}
+              </Text>
+            </View>
+          )}
+          
+          {/* Status Badge */}
+          {blog.status && (
+            <View style={[styles.homeBlogStatusBadge, { backgroundColor: getStatusColor(blog.status) + '20' }]}>
+              <Text style={[styles.homeBlogStatusText, { color: getStatusColor(blog.status) }]}>
+                {blog.status.toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Content */}
+        <View style={styles.homeBlogCardContent}>
+          {/* Title */}
+          <Text
+            style={[styles.homeBlogTitle, { color: theme.colors.text }]}
+            numberOfLines={2}
+          >
+            {blog.title}
+          </Text>
+
+          {/* Content Preview */}
+          <Text
+            style={[styles.homeBlogContentPreview, { color: theme.colors.textSecondary }]}
+            numberOfLines={2}
+          >
+            {blog.content?.replace(/<[^>]*>/g, '').substring(0, 100)}...
+          </Text>
+
+          {/* Meta Information */}
+          <View style={styles.homeBlogMeta}>
+            <View style={styles.homeBlogAuthorInfo}>
+              <Ionicons name="person-outline" size={14} color={theme.colors.textMuted} />
+              <Text style={[styles.homeBlogAuthorText, { color: theme.colors.textMuted }]}>
+                {blog.user?.username || 'Anonymous'}
+              </Text>
+            </View>
+            
+            <View style={styles.homeBlogDateInfo}>
+              <Ionicons name="calendar-outline" size={14} color={theme.colors.textMuted} />
+              <Text style={[styles.homeBlogDateText, { color: theme.colors.textMuted }]}>
+                {formatDate(blog.createdAt)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Stats */}
+          <View style={styles.homeBlogStats}>
+            <View style={styles.homeBlogStatItem}>
+              <Ionicons name="eye-outline" size={16} color={theme.colors.textMuted} />
+              <Text style={[styles.homeBlogStatText, { color: theme.colors.textMuted }]}>
+                {blog.views || 0}
+              </Text>
+            </View>
+            <View style={styles.homeBlogStatItem}>
+              <Ionicons name="heart-outline" size={16} color={theme.colors.textMuted} />
+              <Text style={[styles.homeBlogStatText, { color: theme.colors.textMuted }]}>
+                {blog.likes || 0}
+              </Text>
+            </View>
+            <View style={styles.homeBlogStatItem}>
+              <Ionicons name="chatbubble-outline" size={16} color={theme.colors.textMuted} />
+              <Text style={[styles.homeBlogStatText, { color: theme.colors.textMuted }]}>
+                {blog.comments?.length || 0}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Read More Arrow */}
+        <View style={styles.homeBlogReadMoreContainer}>
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.primary} />
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 // Simple Leaderboard Component
 const SimpleLeaderboard = ({ theme, navigation }) => {
   const [top3, setTop3] = useState([]);
@@ -397,25 +551,7 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
-  const renderBlogCard = (blog) => (
-    <TouchableOpacity
-      key={blog._id}
-      style={[styles.blogCard, { backgroundColor: theme.colors.cardBackground }]}
-      onPress={() => navigation.navigate('BlogDetail', { blogId: blog._id })}
-    >
-      <Text style={[styles.blogTitle, { color: theme.colors.text }]}>
-        {blog.title}
-      </Text>
-      <Text style={[styles.blogContent, { color: theme.colors.textSecondary }]} numberOfLines={3}>
-        {blog.content?.substring(0, 150)}...
-      </Text>
-      <View style={styles.blogMeta}>
-        <Text style={[styles.blogDate, { color: theme.colors.textMuted }]}>
-          {new Date(blog.createdAt).toLocaleDateString()}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+
 
   if (loading) {
     return <LoadingSpinner fullScreen text="Loading..." />;
@@ -547,20 +683,60 @@ export default function HomeScreen() {
       {/* Featured Courses */}
       {courses.length > 0 && (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Featured Courses
-          </Text>
+          <View style={styles.sectionHeaderWithIcon}>
+            <View style={styles.sectionIconContainer}>
+              <Ionicons name="book" size={24} color="#4CC2FF" />
+            </View>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Featured Courses
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
+              Discover our most popular learning paths
+            </Text>
+          </View>
           {courses.map(renderCourseCard)}
+          <TouchableOpacity
+            style={styles.viewAllBlogsButton}
+            onPress={() => navigation.navigate('Courses')}
+          >
+            <Text style={[styles.viewAllBlogsText, { color: '#4CC2FF' }]}>
+              View All Courses →
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
       {/* Latest Blogs */}
       {blogs.length > 0 && (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Latest Articles
-          </Text>
-          {blogs.map(renderBlogCard)}
+          <View style={styles.sectionHeaderWithIcon}>
+            <View style={styles.sectionIconContainer}>
+              <Ionicons name="document-text" size={24} color="#4CC2FF" />
+            </View>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Latest Articles
+            </Text>
+            <Text style={[styles.sectionSubtitle, { color: theme.colors.textSecondary }]}>
+              Stay updated with our latest insights and tips
+            </Text>
+          </View>
+          {blogs.map((blog, index) => (
+            <HomeBlogCard
+              key={blog._id}
+              blog={blog}
+              navigation={navigation}
+              theme={theme}
+              index={index}
+            />
+          ))}
+          <TouchableOpacity
+            style={styles.viewAllBlogsButton}
+            onPress={() => navigation.navigate('Blog')}
+          >
+            <Text style={[styles.viewAllBlogsText, { color: '#4CC2FF' }]}>
+              View All Articles →
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -933,33 +1109,138 @@ const styles = StyleSheet.create({
     fontFamily: 'Mulish-Bold',
   },
 
-  // Blog Cards
-  blogCard: {
+  // Section Headers
+  sectionHeaderWithIcon: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sectionIconContainer: {
+    width: 48,
+    height: 48,
     borderRadius: 12,
-    padding: 16,
+    backgroundColor: 'rgba(76, 194, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  blogTitle: {
-    fontSize: 18,
-    fontFamily: 'Mulish-Bold',
-    marginBottom: 8,
-  },
-  blogContent: {
+  sectionSubtitle: {
     fontSize: 14,
     fontFamily: 'Mulish-Regular',
-    marginBottom: 12,
-    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 4,
   },
-  blogMeta: {
+  
+  // Home Blog Cards (matching BlogScreen design)
+  homeBlogCard: {
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  homeBlogCardTouchable: {
     flexDirection: 'row',
+  },
+  homeBlogImageContainer: {
+    width: 120,
+    height: 140,
+    position: 'relative',
+  },
+  homeBlogCoverImage: {
+    width: '100%',
+    height: '100%',
+  },
+  homeBlogImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeBlogImagePlaceholderText: {
+    fontSize: 32,
+    fontFamily: 'Mulish-Bold',
+  },
+  homeBlogStatusBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  homeBlogStatusText: {
+    fontSize: 10,
+    fontFamily: 'Mulish-Bold',
+  },
+  homeBlogCardContent: {
+    flex: 1,
+    padding: 16,
     justifyContent: 'space-between',
+  },
+  homeBlogTitle: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  homeBlogContentPreview: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Regular',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  homeBlogMeta: {
+    marginBottom: 12,
+  },
+  homeBlogAuthorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  homeBlogAuthorText: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Medium',
+    marginLeft: 4,
+  },
+  homeBlogDateInfo: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  blogDate: {
+  homeBlogDateText: {
     fontSize: 12,
     fontFamily: 'Mulish-Regular',
+    marginLeft: 4,
+  },
+  homeBlogStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  homeBlogStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  homeBlogStatText: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Medium',
+    marginLeft: 4,
+  },
+  homeBlogReadMoreContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingRight: 16,
+  },
+  viewAllBlogsButton: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  viewAllBlogsText: {
+    fontSize: 14,
+    fontFamily: 'Mulish-Medium',
   },
 
   // Lottie Animation

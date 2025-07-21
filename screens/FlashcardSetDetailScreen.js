@@ -5,10 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   RefreshControl,
   Animated,
   Dimensions,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { Card, Button } from 'react-native-elements';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { useConfirmation } from '../context/ConfirmationContext';
 import { createGlobalStyles } from '../utils/globalStyles';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { flashcardService, flashcardSetService, apiUtils } from '../services';
@@ -31,6 +33,12 @@ export default function FlashcardSetDetailScreen() {
   const [error, setError] = useState(null);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingFlashcard, setEditingFlashcard] = useState(null);
+  const [englishContent, setEnglishContent] = useState('');
+  const [vietnameseContent, setVietnameseContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   
   // Animation values
   const flipAnimation = useRef(new Animated.Value(0)).current;
@@ -42,6 +50,7 @@ export default function FlashcardSetDetailScreen() {
   const { user } = useAuth();
   const { theme } = useTheme();
   const { showSuccess, showError } = useToast();
+  const { confirmDelete } = useConfirmation();
   const globalStyles = createGlobalStyles(theme);
 
   const fetchFlashcardSetDetails = async (isRefresh = false) => {
@@ -51,7 +60,6 @@ export default function FlashcardSetDetailScreen() {
     setError(null);
 
     try {
-      console.log('Fetching flashcard set details for ID:', setId);
       
       // Fetch flashcard set details
       const setResponse = await flashcardSetService.getFlashcardSetById(setId);
@@ -89,27 +97,111 @@ export default function FlashcardSetDetailScreen() {
   };
 
   const handleDeleteFlashcardSet = () => {
-    Alert.alert(
-      'Delete Flashcard Set',
-      'Are you sure you want to delete this flashcard set? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await flashcardSetService.deleteFlashcardSet(setId);
-              showSuccess('Flashcard set deleted successfully');
-              navigation.goBack();
-            } catch (err) {
-              const errorInfo = apiUtils.handleError(err);
-              showError(errorInfo.message);
-            }
-          },
-        },
-      ]
-    );
+    confirmDelete(flashcardSet?.name || 'this flashcard set', async () => {
+      try {
+        await flashcardSetService.deleteFlashcardSet(setId);
+        showSuccess('Flashcard set deleted successfully');
+        navigation.goBack();
+      } catch (err) {
+        const errorInfo = apiUtils.handleError(err);
+        showError(errorInfo.message);
+      }
+    });
+  };
+
+  const openCreateModal = () => {
+    setEditingFlashcard(null);
+    setEnglishContent('');
+    setVietnameseContent('');
+    setCreateModalVisible(true);
+  };
+
+  const closeCreateModal = () => {
+    setCreateModalVisible(false);
+    setEditingFlashcard(null);
+    setEnglishContent('');
+    setVietnameseContent('');
+  };
+
+  const openEditModal = (flashcard) => {
+    setEditingFlashcard(flashcard);
+    setEnglishContent(flashcard.englishContent);
+    setVietnameseContent(flashcard.vietnameseContent);
+    setEditModalVisible(true);
+  };
+
+  const closeEditModal = () => {
+    setEditModalVisible(false);
+    setEditingFlashcard(null);
+    setEnglishContent('');
+    setVietnameseContent('');
+  };
+
+  const handleCreateFlashcard = async () => {
+    if (!englishContent.trim() || !vietnameseContent.trim()) {
+      showError('Please fill in both English and Vietnamese content');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await flashcardService.createFlashcard({
+        flashcardSetId: setId,
+        englishContent: englishContent.trim(),
+        vietnameseContent: vietnameseContent.trim(),
+      });
+      
+      showSuccess('Flashcard created successfully!');
+      closeCreateModal();
+      fetchFlashcardSetDetails(true); // Refresh the data
+    } catch (err) {
+      console.error('Error creating flashcard:', err);
+      const errorInfo = apiUtils.handleError(err);
+      showError(errorInfo.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEditFlashcard = async () => {
+    if (!englishContent.trim() || !vietnameseContent.trim()) {
+      showError('Please fill in both English and Vietnamese content');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await flashcardService.updateFlashcard(editingFlashcard._id, {
+        englishContent: englishContent.trim(),
+        vietnameseContent: vietnameseContent.trim(),
+      });
+      
+      showSuccess('Flashcard updated successfully!');
+      closeEditModal();
+      fetchFlashcardSetDetails(true); // Refresh the data
+    } catch (err) {
+      console.error('Error updating flashcard:', err);
+      const errorInfo = apiUtils.handleError(err);
+      showError(errorInfo.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteFlashcard = (flashcard) => {
+    confirmDelete(`"${flashcard.englishContent}"`, async () => {
+      try {
+        await flashcardService.deleteFlashcard(flashcard._id);
+        showSuccess('Flashcard deleted successfully!');
+        fetchFlashcardSetDetails(true);
+      } catch (err) {
+        console.error('Error deleting flashcard:', err);
+        const errorInfo = apiUtils.handleError(err);
+        showError(errorInfo.message);
+      }
+    });
   };
 
   const formatDate = (dateString) => {
@@ -432,71 +524,118 @@ export default function FlashcardSetDetailScreen() {
         </View>
       </Card>
 
-      {/* Animated Flashcard */}
-      <AnimatedFlashcard />
+      {/* Flashcards Content */}
+      {flashcards.length > 0 ? (
+        <>
+          {/* Animated Flashcard */}
+          <AnimatedFlashcard />
 
-      {/* Manage Cards Button (Owner Only) */}
-      {isOwner && (
-        <View style={styles.actionButtons}>
-          <Button
-            title="Manage Cards"
-            icon={{
-              name: 'settings-outline',
-              type: 'ionicon',
-              size: 20,
-              color: theme.colors.buttonText,
-            }}
-            buttonStyle={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceBackground }]}
-            titleStyle={[styles.secondaryButtonText, { color: theme.colors.text }]}
-            onPress={() => navigation.navigate('FlashcardManagement', { setId: flashcardSet._id })}
-          />
-        </View>
-      )}
+          
 
-      {/* Flashcards List */}
-      <Card containerStyle={[styles.cardsCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
-        <Text style={[styles.cardsTitle, { color: theme.colors.text }]}>
-          Flashcards ({flashcards.length})
-        </Text>
+          {/* Flashcards List */}
+          <Card containerStyle={[styles.cardsCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
+            <Text style={[styles.cardsTitle, { color: theme.colors.text }]}>
+              Flashcards ({flashcards.length})
+            </Text>
 
-        {flashcards.length > 0 ? (
-          flashcards.map((flashcard, index) => (
-            <View key={flashcard._id} style={[styles.flashcardItem, { borderBottomColor: theme.colors.borderColor }]}>
-              <View style={styles.flashcardContent}>
-                <View style={styles.flashcardTextRow}>
-                  <View style={styles.flashcardTexts}>
-                    <Text style={[styles.flashcardFront, { color: theme.colors.text }]}>
-                      {flashcard.englishContent}
-                    </Text>
-                    <Text style={[styles.flashcardBack, { color: theme.colors.textSecondary }]}>
-                      {flashcard.vietnameseContent}
-                    </Text>
+            {flashcards.map((flashcard, index) => (
+              <View key={flashcard._id} style={[styles.flashcardItem, { borderBottomColor: theme.colors.borderColor }]}>
+                <View style={styles.flashcardContent}>
+                  <View style={styles.flashcardTextRow}>
+                    <View style={styles.flashcardTexts}>
+                      <Text style={[styles.flashcardFront, { color: theme.colors.text }]}>
+                        {flashcard.englishContent}
+                      </Text>
+                      <Text style={[styles.flashcardBack, { color: theme.colors.textSecondary }]}>
+                        {flashcard.vietnameseContent}
+                      </Text>
+                    </View>
+                    <View style={styles.flashcardActions}>
+                      <TouchableOpacity
+                        style={[styles.listPronunciationButton, { backgroundColor: theme.colors.primary }]}
+                        onPress={() => speakText(flashcard.englishContent)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="volume-high" size={16} color="#fff" />
+                      </TouchableOpacity>
+                      
+                      {isOwner && (
+                        <>
+                          <TouchableOpacity
+                            style={[styles.actionIconButton, { backgroundColor: 'rgba(76, 194, 255, 0.1)' }]}
+                            onPress={() => openEditModal(flashcard)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="pencil" size={16} color={theme.colors.primary} />
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity
+                            style={[styles.actionIconButton, { backgroundColor: 'rgba(255, 107, 107, 0.1)' }]}
+                            onPress={() => handleDeleteFlashcard(flashcard)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="trash" size={16} color="#ff6b6b" />
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
                   </View>
-                  <TouchableOpacity
-                    style={[styles.listPronunciationButton, { backgroundColor: theme.colors.primary }]}
-                    onPress={() => speakText(flashcard.englishContent)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="volume-high" size={16} color="#fff" />
-                  </TouchableOpacity>
+                </View>
+                <View style={styles.flashcardNumber}>
+                  <Text style={[styles.numberText, { color: theme.colors.textMuted }]}>
+                    {index + 1}
+                  </Text>
                 </View>
               </View>
-              <View style={styles.flashcardNumber}>
-                <Text style={[styles.numberText, { color: theme.colors.textMuted }]}>
-                  {index + 1}
-                </Text>
+            ))}
+            
+            {/* Create Flashcard Button (Owner Only) */}
+            {isOwner && (
+              <View style={styles.createCardButtonContainer}>
+                <Button
+                  title="Create Flashcard"
+                  icon={{
+                    name: 'add',
+                    type: 'ionicon',
+                    size: 20,
+                    color: theme.colors.buttonText,
+                  }}
+                  buttonStyle={[styles.createCardButton, { backgroundColor: theme.colors.primary }]}
+                  titleStyle={[styles.createCardButtonText, { color: theme.colors.buttonText }]}
+                  onPress={openCreateModal}
+                />
               </View>
-            </View>
-          ))
-        ) : (
-          <View style={styles.emptyCards}>
-            <Ionicons name="document-outline" size={32} color={theme.colors.textMuted} />
-            <Text style={[styles.emptyCardsText, { color: theme.colors.textSecondary }]}>
+            )}
+          </Card>
+        </>
+      ) : (
+        /* Empty State - No Flashcards */
+        <Card containerStyle={[styles.emptyStateCard, { backgroundColor: theme.colors.cardBackground, borderColor: theme.colors.borderColor }]}>
+          <View style={styles.emptyStateContent}>
+            <Ionicons name="document-outline" size={64} color={theme.colors.textMuted} />
+            <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>
               No flashcards in this set yet
             </Text>
+            <Text style={[styles.emptyStateDescription, { color: theme.colors.textSecondary }]}>
+              Start building your flashcard collection by adding your first card
+            </Text>
+            {isOwner && (
+              <Button
+                title="Create First Flashcard"
+                icon={{
+                  name: 'add',
+                  type: 'ionicon',
+                  size: 20,
+                  color: theme.colors.buttonText,
+                }}
+                buttonStyle={[styles.createFirstCardButton, { backgroundColor: theme.colors.primary }]}
+                titleStyle={[styles.createFirstCardButtonText, { color: theme.colors.buttonText }]}
+                onPress={openCreateModal}
+              />
+            )}
           </View>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Delete Button (Owner Only) */}
       {isOwner && (
@@ -515,6 +654,107 @@ export default function FlashcardSetDetailScreen() {
           />
         </Card>
       )}
+
+      {/* Create/Edit Flashcard Modal */}
+      <Modal
+        visible={createModalVisible || editModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={editModalVisible ? closeEditModal : closeCreateModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                {editModalVisible ? 'Edit Flashcard' : 'Create Flashcard'}
+              </Text>
+              <TouchableOpacity onPress={editModalVisible ? closeEditModal : closeCreateModal}>
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                  English Content *
+                </Text>
+                <TextInput
+                  style={[styles.textArea, { 
+                    backgroundColor: theme.colors.surfaceBackground, 
+                    borderColor: theme.colors.borderColor, 
+                    color: theme.colors.text 
+                  }]}
+                  placeholder="Enter English content..."
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={englishContent}
+                  onChangeText={setEnglishContent}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={200}
+                  textAlignVertical="top"
+                />
+                <Text style={[styles.characterCount, { color: theme.colors.textMuted }]}>
+                  {englishContent.length}/200
+                </Text>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+                  Vietnamese Translation *
+                </Text>
+                <TextInput
+                  style={[styles.textArea, { 
+                    backgroundColor: theme.colors.surfaceBackground, 
+                    borderColor: theme.colors.borderColor, 
+                    color: theme.colors.text 
+                  }]}
+                  placeholder="Enter Vietnamese translation..."
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={vietnameseContent}
+                  onChangeText={setVietnameseContent}
+                  multiline
+                  numberOfLines={3}
+                  maxLength={200}
+                  textAlignVertical="top"
+                />
+                <Text style={[styles.characterCount, { color: theme.colors.textMuted }]}>
+                  {vietnameseContent.length}/200
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton, { borderColor: theme.colors.borderColor }]}
+                onPress={editModalVisible ? closeEditModal : closeCreateModal}
+                disabled={submitting}
+              >
+                <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { 
+                  backgroundColor: (!englishContent.trim() || !vietnameseContent.trim()) 
+                    ? theme.colors.textMuted 
+                    : theme.colors.primary 
+                }]}
+                onPress={editModalVisible ? handleEditFlashcard : handleCreateFlashcard}
+                disabled={submitting || !englishContent.trim() || !vietnameseContent.trim()}
+              >
+                {submitting ? (
+                  <LoadingSpinner size="small" color={theme.colors.buttonText} />
+                ) : (
+                  <Text style={[styles.saveButtonText, { color: theme.colors.buttonText }]}>
+                    {editModalVisible ? 'Update' : 'Create'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -540,6 +780,10 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   titleContainer: {
     flex: 1,
@@ -551,6 +795,7 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+    height: 40,
   },
   detailsCard: {
     borderRadius: 12,
@@ -585,29 +830,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Mulish-Regular',
     marginLeft: 6,
   },
-  actionButtons: {
-    paddingHorizontal: 15,
-    gap: 10,
-  },
-  primaryButton: {
-    borderRadius: 12,
-    paddingVertical: 15,
-    marginBottom: 10,
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontFamily: 'Mulish-Bold',
-  },
-  secondaryButton: {
-    borderRadius: 12,
-    paddingVertical: 15,
-    borderWidth: 1,
-    borderColor: '#444',
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontFamily: 'Mulish-Bold',
-  },
+
   cardsCard: {
     borderRadius: 12,
     margin: 15,
@@ -827,17 +1050,161 @@ const styles = StyleSheet.create({
   flashcardTexts: {
     flex: 1,
   },
+  flashcardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   listPronunciationButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3,
+  },
+  actionIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  // Empty state styles
+  emptyStateCard: {
+    borderRadius: 12,
+    margin: 15,
+    padding: 30,
+  },
+  emptyStateContent: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontFamily: 'Mulish-Bold',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Regular',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  createFirstCardButton: {
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    minWidth: 200,
+  },
+  createFirstCardButtonText: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+  },
+  createCardButtonContainer: {
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  createCardButton: {
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    minWidth: 180,
+  },
+  createCardButtonText: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+  },
+  // Create Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    minHeight: '60%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'Mulish-Bold',
+  },
+  modalBody: {
+    flex: 1,
+    padding: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+    marginBottom: 8,
+  },
+  textArea: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Regular',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 80,
+  },
+  characterCount: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Regular',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  saveButton: {
+    backgroundColor: '#4CC2FF',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
+    color: '#fff',
   },
 }); 

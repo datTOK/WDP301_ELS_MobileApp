@@ -462,12 +462,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
       try {
         const response = await userLessonService.getUserLessonByLessonId(lessonId);
         const result = apiUtils.parseResponse(response);
-        console.log("Fetched user lesson data:", result);
         setUserLesson(result.data.userLesson || null);
-        console.log(
-          "Lesson completion status:",
-          result.data.userLesson?.completed
-        );
         return result.data.userLesson;
       } catch (error) {
         // If not found, create it
@@ -477,12 +472,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
         });
         const result = apiUtils.parseResponse(createResponse);
         if (result.data) {
-          console.log("Created user lesson data:", result);
           setUserLesson(result.data.userLesson || null);
-          console.log(
-            "New lesson completion status:",
-            result.data.userLesson?.completed
-          );
           return result.data.userLesson;
         } else {
           setUserLesson(null);

@@ -120,7 +120,6 @@ export default function MyFlashcardSetsScreen() {
     
     try {
       if (!user?._id) {
-        console.log('No user ID available for fetching flashcard sets');
         setFlashcardSets([]);
         return;
       }

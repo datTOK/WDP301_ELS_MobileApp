@@ -11,11 +11,9 @@ export const AuthProvider = ({ children }) => {
 
   const fetchAndSetUserProfile = useCallback(async (token) => {
     try {
-      console.log('AuthContext: Fetching user profile...');
       const result = await authService.getUserProfile(token);
 
       if (result.success && result.user) {
-        console.log('AuthContext: User profile fetched. User ID:', result.user._id);
         await SecureStorage.setUserData(SECURE_KEYS.USER_PROFILE, JSON.stringify(result.user));
         setUser(result.user);
         return result.user; 
@@ -32,14 +30,10 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const checkAuthStatus = async () => {
-      console.log('AuthContext: Checking authentication status...');
       setIsLoading(true);
       try {
         const token = await SecureStorage.getToken();
         const storedUserProfile = await SecureStorage.getUserData(SECURE_KEYS.USER_PROFILE);
-        
-        console.log('AuthContext: Token found:', !!token);
-        console.log('AuthContext: User profile found:', !!storedUserProfile);
         
         setUserToken(token);
         if (token) {
@@ -47,10 +41,8 @@ export const AuthProvider = ({ children }) => {
             // Use stored profile data
             const userData = JSON.parse(storedUserProfile);
             setUser(userData);
-            console.log('AuthContext: Using stored user profile');
           } else {
             // Fetch fresh profile data
-            console.log('AuthContext: No stored profile, fetching fresh data...');
             try {
               await fetchAndSetUserProfile(token);
             } catch (profileError) {
