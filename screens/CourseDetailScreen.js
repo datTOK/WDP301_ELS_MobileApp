@@ -507,7 +507,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
         lessonService.getLessonGrammars(lessonId),
         lessonService.getLessonVocabulary(lessonId),
         lessonService.getLessonExercises(lessonId),
-        testService.getCourseTests(courseId),
+        testService.getTestsByCourseId(courseId),
       ]);
 
       const lessonData = apiUtils.parseResponse(lessonResponse);
@@ -1461,12 +1461,14 @@ const enhancedTabStyles = {
     fontWeight: "600",
     color: "#b0b8c1",
     textAlign: "center",
+    fontFamily: "Mulish-SemiBold",
   },
 
   // Active Tab Text
   activeTabText: {
     color: "#fff",
     fontWeight: "700",
+    fontFamily: "Mulish-Bold",
   },
 
   // Improved badge styling
@@ -1493,6 +1495,7 @@ const enhancedTabStyles = {
     color: "#fff",
     fontSize: 12,
     fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
 
   // Items container
@@ -1556,6 +1559,7 @@ const enhancedTabStyles = {
     fontWeight: "600",
     color: "#111827",
     marginBottom: 2,
+    fontFamily: "Mulish-SemiBold",
   },
 
   // Item subtitle
@@ -1563,6 +1567,7 @@ const enhancedTabStyles = {
     fontSize: 13,
     color: "#6B7280",
     fontWeight: "500",
+    fontFamily: "Mulish-Medium",
   },
 
   // Start button
@@ -1582,6 +1587,7 @@ const enhancedTabStyles = {
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+    fontFamily: "Mulish-SemiBold",
   },
 
   // Empty state
@@ -1603,6 +1609,7 @@ const enhancedTabStyles = {
     color: "#6B7280",
     textAlign: "center",
     fontWeight: "500",
+    fontFamily: "Mulish-Medium",
   },
 
   // Progress section
@@ -1619,6 +1626,7 @@ const enhancedTabStyles = {
     textAlign: "center",
     marginBottom: 8,
     fontWeight: "500",
+    fontFamily: "Mulish-Medium",
   },
 
   progressBar: {
@@ -1640,15 +1648,16 @@ const enhancedTabStyles = {
 
   // Complete button
   completeButton: {
-    backgroundColor: "#10B981",
+    backgroundColor: "#10D876",
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 24,
     marginTop: 16,
+    marginHorizontal: 12,
     alignItems: "center",
-    shadowColor: "#10B981",
+    shadowColor: "#10D876",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -1657,6 +1666,7 @@ const enhancedTabStyles = {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: "Mulish-SemiBold",
   },
 
   completeButtonDisabled: {
@@ -1689,6 +1699,7 @@ const exerciseItemStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
     marginLeft: 5,
+    fontFamily: "Mulish-Bold",
   },
   questionContainer: {
     marginBottom: 10,
@@ -1697,6 +1708,7 @@ const exerciseItemStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#fff",
+    fontFamily: "Mulish-Bold",
   },
   optionsContainer: {
     marginTop: 5,
@@ -1722,14 +1734,17 @@ const exerciseItemStyles = StyleSheet.create({
   },
   optionText: {
     color: "#fff",
+    fontFamily: "Mulish-Regular",
   },
   selectedOptionText: {
     color: "#fff",
     fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   correctOptionText: {
     color: "#fff",
     fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   textInputContainer: {
     marginTop: 10,
@@ -1740,6 +1755,7 @@ const exerciseItemStyles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     fontSize: 14,
+    fontFamily: "Mulish-Regular",
   },
   correctInput: {
     borderColor: "#28a745",
@@ -1767,12 +1783,15 @@ const exerciseItemStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     marginLeft: 8,
+    fontFamily: "Mulish-Regular",
   },
   correctFeedbackText: {
     color: "#fff",
+    fontFamily: "Mulish-Regular",
   },
   incorrectFeedbackText: {
     color: "#fff",
+    fontFamily: "Mulish-Regular",
   },
   tabNavigation: {
     flexDirection: "row",
@@ -1805,9 +1824,11 @@ const exerciseItemStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     color: "#6B7280",
+    fontFamily: "Mulish-Medium",
   },
   activeTabText: {
     color: "#111827",
+    fontFamily: "Mulish-Medium",
   },
   scrollView: {
     flex: 1,
@@ -1830,6 +1851,7 @@ const exerciseItemStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   postSubmissionButtons: {
     flexDirection: "row",
@@ -1846,6 +1868,7 @@ const exerciseItemStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   seeAnswerButton: {
     backgroundColor: "#6c757d",
@@ -1856,6 +1879,7 @@ const exerciseItemStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   answerContainer: {
     marginTop: 10,
@@ -1866,10 +1890,12 @@ const exerciseItemStyles = StyleSheet.create({
   answerText: {
     color: "#28a745",
     fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   explanationText: {
     color: "#ccc",
     marginTop: 5,
+    fontFamily: "Mulish-Regular",
   },
 });
 

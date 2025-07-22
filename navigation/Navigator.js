@@ -3,7 +3,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
-import LeaderboardScreen from '../screens/LeaderboardScreen';
 import AchievementScreen from '../screens/AchievementScreen';
 import CoursesScreen from '../screens/CoursesScreen';
 import MembershipScreen from '../screens/MembershipScreen';
@@ -188,8 +187,6 @@ export function TabNavigator() {
 
           if (route.name === 'Home') {
             iconName = 'home';
-          } else if (route.name === 'Leaderboard') {
-            iconName = 'trophy';
           } else if (route.name === 'Courses') {
             iconName = 'book';
           } else if (route.name === 'Flashcards') {
@@ -200,8 +197,6 @@ export function TabNavigator() {
             iconName = 'person';
           } else if (route.name === 'Login') {
             iconName = 'log-in';
-          } else if (route.name === 'BlogTab') {
-            iconName = 'newspaper';
           }
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -222,11 +217,9 @@ export function TabNavigator() {
       }
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Leaderboard" component={LeaderboardScreen} />
       <Tab.Screen name="Courses" component={CoursesStackScreen} options={{ tabBarLabel: 'Courses' }} />
       <Tab.Screen name="Flashcards" component={FlashcardStackScreen} options={{ tabBarLabel: 'Flashcards' }} />
       <Tab.Screen name="Membership" component={MembershipScreen} />
-      <Tab.Screen name="BlogTab" component={BlogStackScreen} options={{ tabBarLabel: 'Blog' }} />
       {userToken ? (
         <Tab.Screen name="Profile" component={ProfileStackScreen} />
       ) : (

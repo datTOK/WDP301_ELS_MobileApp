@@ -85,18 +85,18 @@ export const apiUtils = {
       return {
         data: response?.data || null,
         message: null,
-        total: null,
-        totalPages: null,
-        currentPage: null,
+        total: 0,
+        totalPages: 1,
+        currentPage: 1,
       };
     }
 
     return {
       data: response.data?.data || response.data,
-      message: response.data?.message,
-      total: response.data?.total,
-      totalPages: response.data?.totalPages,
-      currentPage: response.data?.currentPage,
+      message: response.message,
+      total: response.total,
+      totalPages: response.totalPages,
+      currentPage: response.currentPage,
     };
   },
 

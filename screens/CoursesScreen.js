@@ -331,6 +331,140 @@ export default function CoursesScreen({ navigation }) {
     return <LoadingSpinner fullScreen text="Loading courses..." />;
   }
 
+  // Error and empty state improvements
+  if (error) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.errorContainer}>
+          <View style={styles.errorIcon}>
+            <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
+          </View>
+          <Text style={styles.errorTitle}>Unable to Load Courses</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchCourses}>
+            <Ionicons name="refresh" size={20} color="#fff" />
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  if (courses.length === 0 && !loading) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: theme.colors.cardBackground }]}>
+          <View style={styles.headerContent}>
+            <View>
+              <View style={styles.titleContainer}>
+                <Ionicons name="library-outline" size={28} color="#4CC2FF" style={styles.titleIcon} />
+                <Text style={[globalStyles.title, { color: theme.colors.text, marginBottom: 0 }]}>
+                  Courses
+                </Text>
+              </View>
+              <Text style={[globalStyles.bodyText, { color: theme.colors.textSecondary }]}>
+                No courses available
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Controls Container */}
+        <View style={styles.controlsContainer}>
+          <SearchBar
+            platform="default"
+            placeholder="Search courses..."
+            onChangeText={setSearch}
+            value={search}
+            containerStyle={styles.searchBarContainer}
+            inputContainerStyle={styles.searchBarInputContainer}
+            inputStyle={styles.searchBarInput}
+            searchIcon={{ size: 20, color: "#4CC2FF" }}
+            clearIcon={
+              search
+                ? {
+                    name: "close",
+                    onPress: () => setSearch(""),
+                    color: "#4CC2FF",
+                  }
+                : null
+            }
+            lightTheme={false}
+          />
+
+          <View style={styles.filtersContainer}>
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterLabel}>Sort by</Text>
+              <View style={styles.filterRow}>
+                <FilterButton
+                  title="Date"
+                  isActive={sortBy === "date"}
+                  onPress={() => {
+                    setSortBy("date");
+                    setPage(1);
+                  }}
+                />
+                <FilterButton
+                  title="Title"
+                  isActive={sortBy === "name"}
+                  onPress={() => {
+                    setSortBy("name");
+                    setPage(1);
+                  }}
+                />
+              </View>
+            </View>
+
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterLabel}>Order</Text>
+              <View style={styles.filterRow}>
+                <FilterButton
+                  title="Ascending"
+                  isActive={order === "asc"}
+                  onPress={() => {
+                    setOrder("asc");
+                    setPage(1);
+                  }}
+                />
+                <FilterButton
+                  title="Descending"
+                  isActive={order === "desc"}
+                  onPress={() => {
+                    setOrder("desc");
+                    setPage(1);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="library-outline" size={80} color="#666" />
+          </View>
+          <Text style={styles.emptyTitle}>No Courses Found</Text>
+          <Text style={styles.emptyText}>
+            {search
+              ? "Try adjusting your search terms or filters"
+              : "No courses are available at the moment. Check back later!"}
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchCourses}>
+            <Ionicons name="refresh" size={20} color="#fff" />
+            <Text style={styles.retryButtonText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -467,7 +601,7 @@ export default function CoursesScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#202020",
+    backgroundColor: "#1A1A1A", // Updated to match other screens
   },
   header: {
     marginHorizontal: 16,
@@ -573,17 +707,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   errorTitle: {
-    fontSize: 20,
-    fontFamily: 'Mulish-Bold',
+    fontSize: 22,
+    fontWeight: 'bold',
     color: "#fff",
     textAlign: "center",
+    fontFamily: "Mulish-Bold",
   },
   errorText: {
     fontSize: 16,
-    color: "#ccc",
+    color: "#AAA",
     textAlign: "center",
     lineHeight: 24,
-    fontFamily: 'Mulish-Regular',
+    fontFamily: "Mulish-Regular",
   },
   retryButton: {
     flexDirection: "row",
@@ -594,11 +729,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 8,
+    shadowColor: "#4CC2FF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontFamily: 'Mulish-Bold',
+    fontWeight: '600',
+    fontFamily: "Mulish-SemiBold",
   },
   emptyContainer: {
     flex: 1,
@@ -611,17 +752,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontFamily: 'Mulish-Bold',
+    fontSize: 24,
+    fontWeight: 'bold',
     color: "#fff",
     textAlign: "center",
+    fontFamily: "Mulish-Bold",
   },
   emptyText: {
     fontSize: 16,
-    color: "#aaa",
+    color: "#AAA",
     textAlign: "center",
     lineHeight: 24,
-    fontFamily: 'Mulish-Regular',
+    fontFamily: "Mulish-Regular",
   },
   paginationContainer: {
     flexDirection: "row",

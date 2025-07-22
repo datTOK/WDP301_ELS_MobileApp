@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { testsAPI, apiUtils } from '../services';
+import { testService, apiUtils } from '../services';
 
 const TestScreenDetail = ({ route, navigation }) => {
   const { testId, testName } = route.params;
@@ -34,14 +34,15 @@ const TestScreenDetail = ({ route, navigation }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await testsAPI.getTestQuestions(testId);
+      const response = await testService.getTestById(testId);
       const result = apiUtils.parseResponse(response);
 
-      if (result.data && Array.isArray(result.data)) {
-        setQuestions(result.data);
+      if (result.data && result.data.test) {
+        // getTestById returns { test: {..., exercises: [...] } }
+        setQuestions(result.data.test.exercises || []);
       } else {
         setQuestions([]);
-        showError('Data Error', 'No questions found for this test.');
+        showError('No questions found for this test.');
       }
     } catch (err) {
       const errorInfo = apiUtils.handleError(err);
@@ -57,10 +58,12 @@ const TestScreenDetail = ({ route, navigation }) => {
       const userId = await fetchUserId();
       if (!userId) return;
 
-      const response = await testsAPI.getUserTests({ testId, userId });
+      const response = await testService.getUserTestByTestId(testId, { userId });
       const result = apiUtils.parseResponse(response);
 
-      if (result.data && result.data.length > 0) {
+      if (result.data && result.data.userTest) {
+        setUserTest(result.data.userTest);
+      } else if (result.data && Array.isArray(result.data) && result.data.length > 0) {
         setUserTest(result.data[0]);
       }
     } catch (err) {
@@ -83,7 +86,7 @@ const TestScreenDetail = ({ route, navigation }) => {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const response = await testsAPI.submitTest(testId, { answers });
+      const response = await testService.submitTest(testId, { answers });
       const result = apiUtils.parseResponse(response);
 
       if (result.data) {

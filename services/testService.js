@@ -3,70 +3,83 @@ import api from './api';
 /**
  * Test Service
  * Handles all test-related API calls
+ * Updated to match backend API routes and frontend web patterns
  */
 class TestService {
   /**
-   * Get tests for a course
+   * Get tests by course ID
+   * Backend route: GET /api/tests/:id/course (id = courseId)
    * @param {string} courseId - Course ID
    * @param {Object} params - Query parameters
    * @param {number} params.page - Page number
    * @param {number} params.size - Page size
    * @returns {Promise<Object>} Course tests response
    */
-  async getCourseTests(courseId, params = {}) {
-    return api.get(`/api/tests/${courseId}/course`, { params });
+  async getTestsByCourseId(courseId, params = {}) {
+    return (await api.get(`/api/tests/${courseId}/course`, { params })).data;
+  }
+
+  /**
+   * Get tests by lesson ID
+   * Backend route: GET /api/tests/lesson/:id (id = lessonId)
+   * @param {string} lessonId - Lesson ID
+   * @param {Object} params - Query parameters
+   * @returns {Promise<Object>} Lesson tests response
+   */
+  async getTestsByLessonId(lessonId, params = {}) {
+    return (await api.get(`/api/tests/lesson/${lessonId}`, { params })).data;
   }
 
   /**
    * Get test by ID
+   * Backend route: GET /api/tests/:id (id = testId)
    * @param {string} testId - Test ID
    * @returns {Promise<Object>} Test details response
    */
   async getTestById(testId) {
-    return api.get(`/api/tests/${testId}`);
+    return (await api.get(`/api/tests/${testId}`)).data;
   }
 
   /**
    * Submit test answers
+   * Backend route: POST /api/tests/:id/submission (id = testId)
    * @param {string} testId - Test ID
-   * @param {Object} answers - Test answers
+   * @param {Object} submissionData - Test submission data
    * @returns {Promise<Object>} Test submission response
    */
-  async submitTest(testId, answers) {
-    return api.post(`/api/tests/${testId}/submission`, answers);
+  async submitTest(testId, submissionData) {
+    return (await api.post(`/api/tests/${testId}/submission`, submissionData)).data;
   }
 
   /**
-   * Get user tests by user ID
-   * @param {string} userId - User ID
-   * @param {Object} params - Query parameters
-   * @param {number} params.page - Page number
-   * @param {number} params.size - Page size
-   * @param {string} params.courseId - Filter by course ID
-   * @param {string} params.status - Filter by test status
-   * @returns {Promise<Object>} User test history response
-   */
-  async getUserTests(userId, params = {}) {
-    return api.get(`/api/user-tests/${userId}/user`, { params });
-  }
-
-  /**
-   * Get user test by test ID
-   * @param {string} testId - Test ID
-   * @param {Object} params - Query parameters
-   * @returns {Promise<Object>} User test response
-   */
-  async getUserTestByTestId(testId, params = {}) {
-    return api.get(`/api/user-tests/${testId}/test`, { params });
-  }
-
-  /**
-   * Create user test
+   * Create test (Admin only)
+   * Backend route: POST /api/tests
    * @param {Object} testData - Test data
-   * @returns {Promise<Object>} User test creation response
+   * @returns {Promise<Object>} Test creation response
    */
-  async createUserTest(testData) {
-    return api.post('/api/user-tests', testData);
+  async createTest(testData) {
+    return (await api.post('/api/tests', testData)).data;
+  }
+
+  /**
+   * Update test (Admin only)
+   * Backend route: PATCH /api/tests/:id
+   * @param {string} testId - Test ID
+   * @param {Object} testData - Updated test data
+   * @returns {Promise<Object>} Test update response
+   */
+  async updateTest(testId, testData) {
+    return (await api.patch(`/api/tests/${testId}`, testData)).data;
+  }
+
+  /**
+   * Delete test (Admin only)
+   * Backend route: DELETE /api/tests/:id
+   * @param {string} testId - Test ID
+   * @returns {Promise<Object>} Test deletion response
+   */
+  async deleteTest(testId) {
+    return (await api.delete(`/api/tests/${testId}`)).data;
   }
 }
 
