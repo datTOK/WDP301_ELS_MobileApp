@@ -18,7 +18,6 @@ export { default as userLessonService } from './userLessonService';
 
 // Exercise Services
 export { default as userExerciseService } from './userExerciseService';
-export { default as exerciseService } from './exerciseService';
 
 // Test Services
 export { default as testService } from './testService';

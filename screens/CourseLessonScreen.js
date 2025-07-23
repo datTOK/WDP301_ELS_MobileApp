@@ -55,15 +55,18 @@ const CourseLessonScreen = ({ route, navigation }) => {
   const fetchCourseInfo = async () => {
     try {
       const response = await courseService.getCourseById(courseId);
-      const course = response.course;
-      setCourseInfo({
-        title: course.name || courseName || "Course Lessons",
-        description: course.description || "",
-        coverImage: course.coverImage,
-      });
+      const result = apiUtils.parseResponse(response);
+      
+      if (result.data) {
+        const course = result.data.course || result.data;
+        setCourseInfo({
+          title: course.name || courseName || "Course Lessons",
+          description: course.description || "",
+          coverImage: course.coverImage,
+        });
+      }
     } catch (err) {
       console.log("Error fetching course info:", err);
-      showError("Error", "Failed to load course information. Please try again later.");
     }
   };
 
@@ -82,7 +85,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
       const response = await courseService.getCourseLessons(courseId);
       const result = apiUtils.parseResponse(response);
 
-      if (!result) {
+      if (!result.data) {
         throw new Error(result.message || "Failed to fetch lessons");
       }
 
@@ -98,8 +101,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
       
     } catch (err) {
       const errorInfo = apiUtils.handleError(err);
-      setError(errorInfo.message || "Failed to load lessons. Please try again later.");
-      showError("Error", errorInfo.message || "Failed to load lessons. Please try again later.");
+      setError(errorInfo.message);
       setLessons([]);
     } finally {
       setLoading(false);
@@ -115,25 +117,24 @@ const CourseLessonScreen = ({ route, navigation }) => {
       const progressPromises = lessonsData.map(async (lesson) => {
         try {
           const response = await userLessonService.getUserLessonByLessonId(lesson._id);
-          const userLesson = response.userLesson;
-          console.log(userLesson)
-          if (userLesson) {
+          const result = apiUtils.parseResponse(response);
+          
+          if (result.data?.userLesson) {
             return {
-              lessonId: userLesson.lesson._id,
-              completed: userLesson.status === "completed",
-              status: userLesson.status || "not_started",
-              currentOrder: userLesson.currentOrder || [],
+              lessonId: lesson._id,
+              completed: result.data.userLesson.status === "completed",
+              status: result.data.userLesson.status || "not_started",
+              currentOrder: result.data.userLesson.currentOrder || [],
             };
           }
           
           return {
-            lessonId: userLesson.lesson._id,
+            lessonId: lesson._id,
             completed: false,
             status: "not_started",
             currentOrder: [],
           };
         } catch (error) {
-          console.log(`Error fetching progress for lesson ${lesson._id}:`, error);
           return {
             lessonId: lesson._id,
             completed: false,
@@ -153,7 +154,6 @@ const CourseLessonScreen = ({ route, navigation }) => {
       setLessonProgress(progressData);
     } catch (error) {
       console.log("Error fetching lesson progress:", error);
-      showError("Error", "Failed to load lesson progress. Please try again later.");
     }
   };
 
@@ -189,7 +189,6 @@ const CourseLessonScreen = ({ route, navigation }) => {
         }
         return true;
       }
-      showError("Error", "Failed to update lesson progress. Please try again.");
       return false;
     } catch (error) {
       console.log("Error updating lesson status:", error);
@@ -278,7 +277,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
           <View style={styles.errorIcon}>
             <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
           </View>
-          <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
+          <Text style={styles.errorTitle}>Unable to Load Lessons</Text>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchLessons}>
             <Ionicons name="refresh" size={20} color="#fff" style={{ marginRight: 8 }} />
@@ -294,14 +293,14 @@ const CourseLessonScreen = ({ route, navigation }) => {
     return (
       <View style={styles.container}>
         <ScrollView 
-          contentContainerStyle={styles.errorContainer}
+          contentContainerStyle={styles.emptyContainer}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          <View style={styles.errorIcon}>
+          <View style={styles.emptyIcon}>
             <Ionicons name="library-outline" size={64} color="#666" />
           </View>
-          <Text style={styles.errorTitle}>No Lessons Available</Text>
-          <Text style={styles.errorText}>
+          <Text style={styles.emptyTitle}>No Lessons Available</Text>
+          <Text style={styles.emptyText}>
             This course doesn't have any lessons yet. Check back later for new content.
           </Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchLessons}>
@@ -763,7 +762,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 32,
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
   errorIcon: {
+    marginBottom: 16,
+  },
+  emptyIcon: {
     marginBottom: 16,
   },
   errorTitle: {
@@ -773,7 +781,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: "Mulish-Bold",
   },
+  emptyTitle: {
+    fontSize: 22,
+    color: "#fff",
+    marginBottom: 8,
+    textAlign: "center",
+    fontFamily: "Mulish-Bold",
+  },
   errorText: {
+    fontSize: 16,
+    color: "#AAA",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 24,
+    fontFamily: "Mulish-Regular",
+  },
+  emptyText: {
     fontSize: 16,
     color: "#AAA",
     textAlign: "center",
