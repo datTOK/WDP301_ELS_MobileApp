@@ -8,10 +8,10 @@ import {
   RefreshControl,
   Dimensions,
   Image,
-} from 'react-native';
-import { Card, Button } from 'react-native-elements';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
+} from "react-native";
+import { Card, Button } from "react-native-elements";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useFocusEffect } from "@react-navigation/native";
@@ -23,7 +23,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
   const { courseId, courseName } = route.params;
   const { userToken, user } = useAuth();
   const { showError, showSuccess, showWarning } = useToast();
-  
+
   // State management
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +56,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
     try {
       const response = await courseService.getCourseById(courseId);
       const result = apiUtils.parseResponse(response);
-      
+
       if (result.data) {
         const course = result.data.course || result.data;
         setCourseInfo({
@@ -80,7 +80,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
 
     setLoading(!refreshing);
     setError(null);
-    
+
     try {
       const response = await courseService.getCourseLessons(courseId);
       const result = apiUtils.parseResponse(response);
@@ -90,7 +90,7 @@ const CourseLessonScreen = ({ route, navigation }) => {
       }
 
       const lessonsData = result.data || [];
-      
+
       if (lessonsData.length === 0) {
         setLessons([]);
         setError(null); // Not an error, just empty
@@ -98,7 +98,6 @@ const CourseLessonScreen = ({ route, navigation }) => {
         setLessons(lessonsData);
         await fetchLessonProgress(lessonsData);
       }
-      
     } catch (err) {
       const errorInfo = apiUtils.handleError(err);
       setError(errorInfo.message);
@@ -116,18 +115,19 @@ const CourseLessonScreen = ({ route, navigation }) => {
     try {
       const progressPromises = lessonsData.map(async (lesson) => {
         try {
-          const response = await userLessonService.getUserLessonByLessonId(lesson._id);
-          const result = apiUtils.parseResponse(response);
-          
-          if (result.data?.userLesson) {
+          const response = await userLessonService.getUserLessonByLessonId(
+            lesson._id
+          );
+
+          if (response.userLesson) {
             return {
               lessonId: lesson._id,
-              completed: result.data.userLesson.status === "completed",
-              status: result.data.userLesson.status || "not_started",
-              currentOrder: result.data.userLesson.currentOrder || [],
+              completed: response.userLesson.status === "completed",
+              status: response.userLesson.status || "not_started",
+              currentOrder: response.userLesson.currentOrder || [],
             };
           }
-          
+
           return {
             lessonId: lesson._id,
             completed: false,
@@ -147,9 +147,11 @@ const CourseLessonScreen = ({ route, navigation }) => {
       const progressResults = await Promise.all(progressPromises);
       const progressData = {};
 
-      progressResults.forEach(({ lessonId, completed, status, currentOrder }) => {
-        progressData[lessonId] = { completed, status, currentOrder };
-      });
+      progressResults.forEach(
+        ({ lessonId, completed, status, currentOrder }) => {
+          progressData[lessonId] = { completed, status, currentOrder };
+        }
+      );
 
       setLessonProgress(progressData);
     } catch (error) {
@@ -160,11 +162,15 @@ const CourseLessonScreen = ({ route, navigation }) => {
   // Update lesson status
   const updateLessonStatus = async (lessonId, status) => {
     try {
-      const lessonResponse = await userLessonService.getUserLessonByLessonId(lessonId);
+      const lessonResponse =
+        await userLessonService.getUserLessonByLessonId(lessonId);
       const lessonResult = apiUtils.parseResponse(lessonResponse);
 
       if (!lessonResult.data?.userLesson?._id) {
-        showError("Error", "Unable to update lesson progress. Please try again.");
+        showError(
+          "Error",
+          "Unable to update lesson progress. Please try again."
+        );
         return false;
       }
 
@@ -217,8 +223,10 @@ const CourseLessonScreen = ({ route, navigation }) => {
   const getLessonStatusInfo = (lessonId, index) => {
     const progress = lessonProgress[lessonId];
     const isCompleted = progress?.completed || false;
-    const isLocked = index > 0 && !(lessonProgress[lessons[index - 1]?._id]?.completed || false);
-    
+    const isLocked =
+      index > 0 &&
+      !(lessonProgress[lessons[index - 1]?._id]?.completed || false);
+
     let statusText = "Not Started";
     let statusColor = "#666";
     let iconName = "play-circle-outline";
@@ -241,17 +249,24 @@ const CourseLessonScreen = ({ route, navigation }) => {
       iconColor = "#FF9500";
     }
 
-    return { statusText, statusColor, iconName, iconColor, isLocked, isCompleted };
+    return {
+      statusText,
+      statusColor,
+      iconName,
+      iconColor,
+      isLocked,
+      isCompleted,
+    };
   };
 
   // Calculate overall progress
   const calculateProgress = () => {
     if (lessons.length === 0) return { completed: 0, total: 0, percentage: 0 };
-    
+
     const completedCount = lessons.filter(
-      lesson => lessonProgress[lesson._id]?.completed
+      (lesson) => lessonProgress[lesson._id]?.completed
     ).length;
-    
+
     return {
       completed: completedCount,
       total: lessons.length,
@@ -270,9 +285,11 @@ const CourseLessonScreen = ({ route, navigation }) => {
   if (error) {
     return (
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.errorContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           <View style={styles.errorIcon}>
             <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
@@ -280,7 +297,12 @@ const CourseLessonScreen = ({ route, navigation }) => {
           <Text style={styles.errorTitle}>Unable to Load Lessons</Text>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchLessons}>
-            <Ionicons name="refresh" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Ionicons
+              name="refresh"
+              size={20}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -292,19 +314,27 @@ const CourseLessonScreen = ({ route, navigation }) => {
   if (!loading && lessons.length === 0) {
     return (
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.emptyContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           <View style={styles.emptyIcon}>
             <Ionicons name="library-outline" size={64} color="#666" />
           </View>
           <Text style={styles.emptyTitle}>No Lessons Available</Text>
           <Text style={styles.emptyText}>
-            This course doesn't have any lessons yet. Check back later for new content.
+            This course doesn't have any lessons yet. Check back later for new
+            content.
           </Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchLessons}>
-            <Ionicons name="refresh" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Ionicons
+              name="refresh"
+              size={20}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.retryButtonText}>Refresh</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -346,10 +376,15 @@ const CourseLessonScreen = ({ route, navigation }) => {
           <Text style={styles.progressTitle}>Course Progress</Text>
           <Text style={styles.progressPercentage}>{progress.percentage}%</Text>
         </View>
-        
+
         <View style={styles.progressBarContainer}>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress.percentage}%` }]} />
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${progress.percentage}%` },
+              ]}
+            />
           </View>
         </View>
 
@@ -365,7 +400,9 @@ const CourseLessonScreen = ({ route, navigation }) => {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{progress.total - progress.completed}</Text>
+            <Text style={styles.statNumber}>
+              {progress.total - progress.completed}
+            </Text>
             <Text style={styles.statLabel}>Remaining</Text>
           </View>
         </View>
@@ -376,13 +413,15 @@ const CourseLessonScreen = ({ route, navigation }) => {
         style={styles.lessonsContainer}
         contentContainerStyle={styles.lessonsContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <Text style={styles.lessonsTitle}>Lessons ({lessons.length})</Text>
-        
+
         {lessons.map((lesson, index) => {
           const statusInfo = getLessonStatusInfo(lesson._id, index);
-          
+
           return (
             <TouchableOpacity
               key={lesson._id}
@@ -396,42 +435,57 @@ const CourseLessonScreen = ({ route, navigation }) => {
               activeOpacity={statusInfo.isLocked ? 1 : 0.7}
             >
               <View style={styles.lessonHeader}>
-                <View style={[
-                  styles.lessonNumberContainer,
-                  statusInfo.isCompleted && styles.completedNumberContainer,
-                  statusInfo.isLocked && styles.lockedNumberContainer
-                ]}>
-                  <Text style={[
-                    styles.lessonNumber,
-                    statusInfo.isCompleted && styles.completedLessonNumber,
-                    statusInfo.isLocked && styles.lockedLessonNumber
-                  ]}>
+                <View
+                  style={[
+                    styles.lessonNumberContainer,
+                    statusInfo.isCompleted && styles.completedNumberContainer,
+                    statusInfo.isLocked && styles.lockedNumberContainer,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.lessonNumber,
+                      statusInfo.isCompleted && styles.completedLessonNumber,
+                      statusInfo.isLocked && styles.lockedLessonNumber,
+                    ]}
+                  >
                     {index + 1}
                   </Text>
                 </View>
-                
+
                 <View style={styles.lessonInfo}>
-                  <Text style={[
-                    styles.lessonTitle,
-                    statusInfo.isLocked && styles.lockedText
-                  ]} numberOfLines={2}>
+                  <Text
+                    style={[
+                      styles.lessonTitle,
+                      statusInfo.isLocked && styles.lockedText,
+                    ]}
+                    numberOfLines={2}
+                  >
                     {lesson.name}
                   </Text>
-                  <Text style={[
-                    styles.lessonDescription,
-                    statusInfo.isLocked && styles.lockedDescription
-                  ]} numberOfLines={2}>
+                  <Text
+                    style={[
+                      styles.lessonDescription,
+                      statusInfo.isLocked && styles.lockedDescription,
+                    ]}
+                    numberOfLines={2}
+                  >
                     {lesson.description || "No description available"}
                   </Text>
-                  
+
                   <View style={styles.lessonStatus}>
-                    <Ionicons 
-                      name={statusInfo.iconName} 
-                      size={16} 
+                    <Ionicons
+                      name={statusInfo.iconName}
+                      size={16}
                       color={statusInfo.iconColor}
                       style={{ marginRight: 6 }}
                     />
-                    <Text style={[styles.statusText, { color: statusInfo.statusColor }]}>
+                    <Text
+                      style={[
+                        styles.statusText,
+                        { color: statusInfo.statusColor },
+                      ]}
+                    >
                       {statusInfo.statusText}
                     </Text>
                   </View>

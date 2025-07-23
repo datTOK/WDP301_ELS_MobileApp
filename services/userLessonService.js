@@ -1,4 +1,4 @@
-import api from './api';
+import api from "./api";
 
 /**
  * User Lesson Service
@@ -16,7 +16,7 @@ class UserLessonService {
    * @returns {Promise<Object>} User lesson creation response
    */
   async createUserLesson(userLessonData) {
-    const response = await api.post('/api/user-lessons', userLessonData);
+    const response = await api.post("/api/user-lessons", userLessonData);
     return response.data;
   }
 
@@ -30,7 +30,9 @@ class UserLessonService {
    * @returns {Promise<Object>} User lessons response
    */
   async getUserLessonsByUserId(userId, params = {}) {
-    const response = await api.get(`/api/user-lessons/${userId}/user`, { params });
+    const response = await api.get(`/api/user-lessons/${userId}/user`, {
+      params,
+    });
     return response.data;
   }
 
@@ -65,7 +67,10 @@ class UserLessonService {
    * @returns {Promise<Object>} User lesson update response
    */
   async updateUserLesson(userLessonId, updateData) {
-    const response = await api.patch(`/api/user-lessons/${userLessonId}`, updateData);
+    const response = await api.patch(
+      `/api/user-lessons/${userLessonId}`,
+      updateData
+    );
     return response.data;
   }
 
@@ -76,7 +81,7 @@ class UserLessonService {
    * @returns {Promise<Object>} User lesson update response
    */
   async updateUserLessonStatus(userLessonId, status) {
-    return this.updateUserLesson(userLessonId, { status });
+    return await this.updateUserLesson(userLessonId, { status });
   }
 
   /**
@@ -101,4 +106,4 @@ class UserLessonService {
   }
 }
 
-export default new UserLessonService(); 
+export default new UserLessonService();

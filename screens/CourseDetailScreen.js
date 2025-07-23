@@ -20,7 +20,13 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import prettyFormat from "pretty-format";
 import axios from "axios";
-import { lessonService, userLessonService, userExerciseService, testService, apiUtils } from "../services";
+import {
+  lessonService,
+  userLessonService,
+  userExerciseService,
+  testService,
+  apiUtils,
+} from "../services";
 
 const ExerciseItem = ({
   exercise,
@@ -75,7 +81,7 @@ const ExerciseItem = ({
 
   const checkAnswer = async () => {
     if (!userAnswer.trim() && !selectedOption) {
-      showError('Error', 'Please provide an answer before submitting.');
+      showError("Error", "Please provide an answer before submitting.");
       return;
     }
 
@@ -97,25 +103,21 @@ const ExerciseItem = ({
         id: exercise._id,
         answer: answer,
       });
-      
-      const result = apiUtils.parseResponse(response);
 
-      if (result.data && result.message === "Correct answer") {
+      if (response.message === "Correct answer") {
         setIsCorrect(true);
         setIsSubmitted(true);
         setShowFeedback(true);
-        setFeedbackMessage(result.message);
+        setFeedbackMessage(response.message);
         // Try to get explanation from result, fallback to exercise.explanation
         setFeedbackExplanation(
-          result.data.userExercise?.exercise?.explanation ||
-            result.data.explanation ||
-            exercise.explanation ||
-            ""
+          response.userExercise?.exercise?.explanation || ""
         );
 
-        if (onSubmission) {
-          onSubmission(exercise._id, result.data.isCorrect);
-        }
+        //this does nothing?
+        // if (onSubmission) {
+        //   onSubmission(exercise._id, result.data.isCorrect);
+        // }
 
         if (onExerciseCompleted) {
           onExerciseCompleted(exercise._id, true);
@@ -138,7 +140,7 @@ const ExerciseItem = ({
       }
     } catch (error) {
       const errorInfo = apiUtils.handleError(error);
-      showError('Error', errorInfo.message);
+      showError("Error", errorInfo.message);
       // Show local validation result even if API fails
       if (onExerciseCompleted) {
         onExerciseCompleted(exercise._id, isAnswerCorrect);
@@ -431,28 +433,43 @@ const CourseDetailScreen = ({ route, navigation }) => {
     console.log("Lesson ID: ", lessonId);
 
     // Check if lesson is already completed from API
-    if (userLesson?.completed) {
-      showWarning('Already Completed', 'This lesson has already been completed. You can review the content but cannot mark it as completed again.');
+    if (userLesson?.status === "completed") {
+      showWarning(
+        "Already Completed",
+        "This lesson has already been completed. You can review the content but cannot mark it as completed again."
+      );
       return;
     }
 
     if (!isLessonFullyCompleted()) {
-      showWarning('Incomplete', 'Please complete all exercises correctly before marking this lesson as completed.');
+      showWarning(
+        "Incomplete",
+        "Please complete all exercises correctly before marking this lesson as completed."
+      );
       return;
     }
+    const userLessonResponse =
+      await userLessonService.getUserLessonByLessonId(lessonId);
 
-    if (updateLessonStatus) {
-      const success = await updateLessonStatus(lessonId, "completed");
-      if (success) {
-        setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-        showSuccess('Success', 'Lesson completed! You can now proceed to the next lesson.');
-      } else {
-        showError('Error', 'Failed to update lesson status. Please try again.');
-      }
+    const response = await userLessonService.updateUserLessonStatus(
+      userLessonResponse.userLesson._id.toString(),
+      "completed"
+    );
+
+    if (response) {
+      setUserLesson(response.userLesson);
+      showSuccess(
+        "Success",
+        "Lesson completed! You can now proceed to the next lesson."
+      );
     } else {
-      setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-      showSuccess('Success', 'Lesson completed! You can now proceed to the next lesson.');
+      showError("Error", "Failed to update lesson status. Please try again.");
     }
+
+    showSuccess(
+      "Success",
+      "Lesson completed! You can now proceed to the next lesson."
+    );
   };
 
   // Fetch or create user lesson record, then fetch userLesson data
@@ -460,10 +477,12 @@ const CourseDetailScreen = ({ route, navigation }) => {
     try {
       // Try to fetch userLesson first
       try {
-        const response = await userLessonService.getUserLessonByLessonId(lessonId);
-        const result = apiUtils.parseResponse(response);
-        setUserLesson(result.data.userLesson || null);
-        return result.data.userLesson;
+        const response =
+          await userLessonService.getUserLessonByLessonId(lessonId);
+
+        const result = response.userLesson;
+        setUserLesson(result || null);
+        return result;
       } catch (error) {
         // If not found, create it
         const createResponse = await userLessonService.createUserLesson({
@@ -503,38 +522,50 @@ const CourseDetailScreen = ({ route, navigation }) => {
         exerciseResponse,
         testsResponse,
       ] = await Promise.all([
-        lessonService.getLessonById(lessonId),
-        lessonService.getLessonGrammars(lessonId),
-        lessonService.getLessonVocabulary(lessonId),
-        lessonService.getLessonExercises(lessonId),
-        testService.getTestsByCourseId(courseId),
+        await lessonService.getLessonById(lessonId),
+        await lessonService.getLessonGrammars(lessonId),
+        await lessonService.getLessonVocabulary(lessonId),
+        await lessonService.getLessonExercises(lessonId),
+        await testService.getTestsByCourseId(courseId),
       ]);
 
-      const lessonData = apiUtils.parseResponse(lessonResponse);
+      //lessonData not need parsing
+      const lessonData = lessonResponse;
       const grammarData = apiUtils.parseResponse(grammarResponse);
       const vocabData = apiUtils.parseResponse(vocabResponse);
       const exerciseData = apiUtils.parseResponse(exerciseResponse);
       const testsData = apiUtils.parseResponse(testsResponse);
 
       if (
-        !lessonData.data ||
+        !lessonData ||
         !grammarData.data ||
         !vocabData.data ||
         !exerciseData.data ||
         !testsData.data
       ) {
+        console.log(
+          !lessonData,
+          !grammarData.data,
+          !vocabData.data,
+          !exerciseData.data,
+          !testsData.data
+        );
         throw new Error("Failed to fetch lesson details");
       }
 
       if (exerciseData.data && exerciseData.data.length > 0) {
         const progress = {};
+        console.log("Handling exercise completion");
         await Promise.all(
           exerciseData.data.map(async (e) => {
             try {
-              const response = await axios.get(
-                `${MOBILE_SERVER_URL}api/user-exercises/${e._id.toString()}/exercise`
-              );
-              const userExercise = response.data.userExercise;
+              const response =
+                await userExerciseService.getUserExerciseByExerciseId(
+                  e._id.toString()
+                );
+
+              const userExercise = response.userExercise;
+
               progress[e._id] = userExercise.completed === true;
             } catch (err) {
               progress[e._id] = false;
@@ -777,7 +808,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
                 exercise={item}
                 onSubmission={handleExerciseSubmission}
                 onExerciseCompleted={handleExerciseCompletion}
-                isLessonCompleted={userLesson?.completed}
+                isLessonCompleted={userLesson?.status === "completed"}
               />
             </View>
           )}
@@ -798,7 +829,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
       contentContainerStyle={styles.lessonContentScrollContainer}
       showsVerticalScrollIndicator={false}
     >
-      {userLesson?.completed && (
+      {userLesson?.status === "completed" && (
         <View style={styles.lessonCompletedBanner}>
           <Ionicons name="checkmark-circle" size={24} color="#fff" />
           <Text style={styles.lessonCompletedText}>
@@ -819,7 +850,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
           <View style={styles.progressContainer}>
             <Text style={styles.progressText}>
               Exercises Progress:{" "}
-              {userLesson?.completed
+              {userLesson?.status === "completed"
                 ? lesson.exercises.length
                 : Object.values(completedExercises).filter((correct) => correct)
                     .length}{" "}
@@ -831,7 +862,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
                   styles.progressFill,
                   {
                     width: `${
-                      userLesson?.completed
+                      userLesson?.status === "completed"
                         ? 100
                         : (Object.values(completedExercises).filter(
                             (correct) => correct
@@ -848,21 +879,23 @@ const CourseDetailScreen = ({ route, navigation }) => {
       </Card>
       <Button
         title={
-          userLesson?.completed
+          userLesson?.status === "completed"
             ? "Lesson Completed"
             : isLessonFullyCompleted()
             ? "Mark as Completed"
             : "Complete All Exercises"
         }
         buttonStyle={
-          userLesson?.completed
+          userLesson?.status === "completed"
             ? styles.completedButton
             : isLessonFullyCompleted()
             ? styles.completeButton
             : styles.incompleteButton
         }
         onPress={() => markLessonCompleted(lessonId)}
-        disabled={userLesson?.completed || !isLessonFullyCompleted()}
+        disabled={
+          userLesson?.status === "completed" || !isLessonFullyCompleted()
+        }
       />
       {Platform.OS === "web" ? (
         <Overlay
@@ -949,6 +982,8 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     maxWidth: "100%",
+    height: "80%",
+    overflowY: "scroll",
   },
   // Header (dark)
   headerDark: {
@@ -1383,6 +1418,31 @@ const styles = StyleSheet.create({
     backgroundColor: "#222",
     borderRadius: 16,
     padding: 20,
+  },
+  completedButton: {
+    marginVertical: 10,
+    marginHorizontal: 15,
+    borderRadius: 10,
+    backgroundColor: "#4CAF50",
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  completeButton: {
+    marginVertical: 10,
+    marginHorizontal: 15,
+    borderRadius: 10,
+    backgroundColor: "#2196F3",
+    borderWidth: 1,
+    borderColor: "#2196F3",
+  },
+  incompleteButton: {
+    marginVertical: 10,
+    marginHorizontal: 15,
+    borderRadius: 10,
+    backgroundColor: "#f5f5f5",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    opacity: 0.6,
   },
 });
 
