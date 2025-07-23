@@ -51,10 +51,15 @@ export default function AchievementScreen() {
       });
       
       const result = apiUtils.parseResponse(response);
-      console.log(result.data);
       
       if (result.data && Array.isArray(result.data)) {
-        setAchievements(result.data);
+        // Sort achievements by date (most recent first)
+        const sortedAchievements = result.data.sort((a, b) => {
+          const dateA = new Date(a.createdAt);
+          const dateB = new Date(b.createdAt);
+          return dateB - dateA; // Most recent first
+        });
+        setAchievements(sortedAchievements);
       } else {
         setAchievements([]);
       }
@@ -87,7 +92,7 @@ export default function AchievementScreen() {
       <View style={styles.achievementContent}>
         <View style={styles.achievementHeader}>
           <Text style={[styles.achievementTitle, { color: theme.colors.text }]}>
-            {item.achievement?.title || 'Unknown Achievement'}
+            {item.achievement?.name || 'Unknown Achievement'}
           </Text>
           <Ionicons name="trophy" size={20} color="#FFD700" />
         </View>

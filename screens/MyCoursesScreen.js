@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Card } from 'react-native-elements';
 import { useToast } from '../context/ToastContext';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { userCourseService, courseService, apiUtils } from '../services';
 
@@ -22,11 +22,20 @@ const { width } = Dimensions.get("window");
 const MyCourseCard = ({ course, navigation, progress }) => {
   const [imageError, setImageError] = useState(false);
 
+  const handleCoursePress = () => {
+    if (course.isDeleted) {
+      // Don't navigate for deleted courses
+      return;
+    }
+    navigation.navigate('CourseOverview', { courseId: course._id });
+  };
+
   return (
     <TouchableOpacity
-      style={styles.courseCard}
-      onPress={() => navigation.navigate('CourseOverview', { courseId: course._id })}
-      activeOpacity={0.8}
+      style={[styles.courseCard, course.isDeleted && styles.deletedCourseCard]}
+      onPress={handleCoursePress}
+      activeOpacity={course.isDeleted ? 1 : 0.8}
+      disabled={course.isDeleted}
     >
       <View style={styles.imageContainer}>
         <Image
@@ -85,23 +94,30 @@ const MyCourseCard = ({ course, navigation, progress }) => {
         )}
 
         {/* Action Button */}
-        <TouchableOpacity
-          style={styles.continueButton}
-          onPress={() => navigation.navigate('CourseLesson', { 
-            courseId: course._id, 
-            courseName: course.name 
-          })}
-        >
-          <Ionicons 
-            name={progress === 100 ? "refresh" : "play"} 
-            size={16} 
-            color="#fff" 
-            style={{ marginRight: 6 }}
-          />
-          <Text style={styles.continueButtonText}>
-            {progress === 100 ? "Review" : "Continue"}
-          </Text>
-        </TouchableOpacity>
+        {!course.isDeleted ? (
+          <TouchableOpacity
+            style={styles.continueButton}
+            onPress={() => navigation.navigate('CourseLesson', { 
+              courseId: course._id, 
+              courseName: course.name 
+            })}
+          >
+            <Ionicons 
+              name={progress === 100 ? "refresh" : "play"} 
+              size={16} 
+              color="#fff" 
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.continueButtonText}>
+              {progress === 100 ? "Review" : "Continue"}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.deletedButton}>
+            <Ionicons name="close-circle" size={16} color="#FF6B6B" style={{ marginRight: 6 }} />
+            <Text style={styles.deletedButtonText}>Course Unavailable</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -116,6 +132,7 @@ const MyCoursesScreen = ({ navigation }) => {
   
   const { user } = useAuth();
   const { showError } = useToast();
+  const nav = useNavigation();
 
   // Fetch courses on component mount and focus
   useEffect(() => {
@@ -144,37 +161,45 @@ const MyCoursesScreen = ({ navigation }) => {
       // Fetch user courses
       const response = await userCourseService.getUserCoursesByUserId(user._id, {
         page: 1,
-        size: 100
+        size: 9999
       });
-      
-      const result = apiUtils.parseResponse(response);
 
-      if (!result.data || !Array.isArray(result.data)) {
+      if (!response.data || !Array.isArray(response.data)) {
         setCourses([]);
         setCourseProgress({});
         return;
       }
 
-      // Fetch detailed course information for each enrolled course
-      const courseDetailsPromises = result.data.map(async (userCourse) => {
-        try {
-          const courseResponse = await courseService.getCourseById(userCourse.courseId);
-          const courseResult = apiUtils.parseResponse(courseResponse);
-          
-          if (courseResult.data) {
-            const courseData = courseResult.data.course || courseResult.data;
+              // Fetch detailed course information for each enrolled course
+        const courseDetailsPromises = response.data.map(async (userCourse) => {
+          try {
+            const courseResponse = await courseService.getCourseById(userCourse.courseId);
+            
+            if (courseResponse && courseResponse.course) {
+              const courseData = courseResponse.course;
+              return {
+                ...courseData,
+                userCourse,
+                enrolledAt: userCourse.createdAt,
+              };
+            }
+            return null;
+          } catch (courseError) {
+            console.error('Error fetching course details:', userCourse.courseId, courseError);
+            // Return a placeholder course object for deleted courses
             return {
-              ...courseData,
+              _id: userCourse.courseId,
+              name: 'Course Unavailable',
+              description: 'This course is no longer available.',
+              coverImage: null,
+              level: 'Unknown',
+              createdAt: userCourse.createdAt,
               userCourse,
               enrolledAt: userCourse.createdAt,
+              isDeleted: true,
             };
           }
-          return null;
-        } catch (courseError) {
-          console.error('Error fetching course details:', userCourse.courseId, courseError);
-          return null;
-        }
-      });
+        });
 
       const courseDetails = await Promise.all(courseDetailsPromises);
       const validCourses = courseDetails.filter(course => course !== null);
@@ -224,6 +249,16 @@ const MyCoursesScreen = ({ navigation }) => {
   if (error) {
     return (
       <View style={styles.container}>
+        {/* Back Button for Error State */}
+        <View style={styles.errorHeader}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => nav.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        
         <View style={styles.errorContainer}>
           <View style={styles.errorIcon}>
             <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
@@ -243,6 +278,16 @@ const MyCoursesScreen = ({ navigation }) => {
   if (!loading && courses.length === 0) {
     return (
       <View style={styles.container}>
+        {/* Back Button for Empty State */}
+        <View style={styles.errorHeader}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => nav.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIcon}>
             <Ionicons name="school-outline" size={80} color="#666" />
@@ -274,9 +319,18 @@ const MyCoursesScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.headerContainer}>
         <View style={styles.headerContent}>
-          <View style={styles.titleContainer}>
-            <Ionicons name="school" size={28} color="#4CC2FF" style={{ marginRight: 12 }} />
-            <Text style={styles.headerTitle}>My Courses</Text>
+          <View style={styles.headerTop}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => nav.goBack()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <Ionicons name="school" size={28} color="#4CC2FF" style={{ marginRight: 12 }} />
+              <Text style={styles.headerTitle}>My Courses</Text>
+            </View>
+            <View style={styles.headerSpacer} />
           </View>
           <Text style={styles.headerSubtitle}>
             {courses.length} course{courses.length !== 1 ? "s" : ""} enrolled
@@ -331,6 +385,20 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: 'rgba(76, 194, 255, 0.1)',
     borderRadius: 16,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  headerSpacer: {
+    width: 40,
   },
   titleContainer: {
     flexDirection: 'row',
@@ -486,8 +554,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: "Mulish-SemiBold",
   },
+  deletedCourseCard: {
+    opacity: 0.6,
+    backgroundColor: '#1A1A1A',
+  },
+  deletedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
+  deletedButtonText: {
+    color: '#FF6B6B',
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: "Mulish-SemiBold",
+  },
 
   // Error States
+  errorHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
