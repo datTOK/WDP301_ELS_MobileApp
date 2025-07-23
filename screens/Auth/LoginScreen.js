@@ -1,5 +1,5 @@
 // screens/Auth/LoginScreen.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,18 +10,18 @@ import {
   Platform,
   ScrollView,
   Animated,
-} from 'react-native';
-import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { useToast } from '../../context/ToastContext';
-import { createGlobalStyles } from '../../utils/globalStyles';
-import LoadingSpinner from '../../components/LoadingSpinner';
-import { authService, apiUtils } from '../../services';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import { useToast } from "../../context/ToastContext";
+import { createGlobalStyles } from "../../utils/globalStyles";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import { authService, apiUtils } from "../../services";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { signIn } = useAuth();
   const { theme } = useTheme();
@@ -57,28 +57,29 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      showError('Please fill in all fields');
+      showError("Please fill in all fields");
       return;
     }
 
     setIsLoading(true);
     try {
       const response = await authService.login({ email, password });
+
       const result = apiUtils.parseResponse(response);
-      
+
       if (result.data?.accessToken) {
         try {
           await signIn(result.data.accessToken);
-          showSuccess('Login successful!');
+          showSuccess("Login successful!");
           navigation.reset({
             index: 0,
-            routes: [{ name: 'Main' }],
+            routes: [{ name: "Main" }],
           });
         } catch (authError) {
-          showError('Failed to save login session. Please try again.');
+          showError("Failed to save login session. Please try again.");
         }
       } else {
-        showError('Invalid response from server');
+        showError("Invalid response from server");
       }
     } catch (error) {
       const errorInfo = apiUtils.handleError(error);
@@ -93,15 +94,15 @@ export default function LoginScreen({ navigation }) {
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* Back to Home Button */}
       <View style={localStyles.headerNav}>
         <TouchableOpacity
           style={localStyles.backButton}
-          onPress={() => navigation.navigate('GuestHome')}
+          onPress={() => navigation.navigate("GuestHome")}
           activeOpacity={0.7}
         >
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
@@ -109,21 +110,21 @@ export default function LoginScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContainer, localStyles.centeredContainer]}
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContainer,
+          localStyles.centeredContainer,
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Logo and Header */}
-        <Animated.View 
+        <Animated.View
           style={[
             localStyles.headerSection,
             {
               opacity: fadeAnim,
-              transform: [
-                { translateY: slideAnim },
-                { scale: logoScale }
-              ],
-            }
+              transform: [{ translateY: slideAnim }, { scale: logoScale }],
+            },
           ]}
         >
           <Text style={localStyles.elsLogo}>ELS</Text>
@@ -134,17 +135,17 @@ export default function LoginScreen({ navigation }) {
         </Animated.View>
 
         {/* Login Form */}
-        <Animated.View 
+        <Animated.View
           style={[
             styles.card,
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
-            }
+            },
           ]}
         >
           <Text style={localStyles.centeredHeading}>Login</Text>
-          
+
           <View style={localStyles.inputContainer}>
             <Text style={localStyles.label}>Email</Text>
             <TextInput
@@ -182,7 +183,7 @@ export default function LoginScreen({ navigation }) {
 
           <TouchableOpacity
             style={localStyles.forgotPasswordButton}
-            onPress={() => navigation.navigate('ChangePassword')}
+            onPress={() => navigation.navigate("ChangePassword")}
           >
             <Text style={localStyles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
@@ -191,10 +192,10 @@ export default function LoginScreen({ navigation }) {
         {/* Sign Up Section */}
         <View style={styles.card}>
           <Text style={styles.bodyText}>
-            Don't have an account?{' '}
-            <Text 
+            Don't have an account?{" "}
+            <Text
               style={localStyles.linkText}
-              onPress={() => navigation.navigate('Signup')}
+              onPress={() => navigation.navigate("Signup")}
             >
               Sign up here
             </Text>
@@ -207,52 +208,52 @@ export default function LoginScreen({ navigation }) {
 
 const localStyles = StyleSheet.create({
   headerNav: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 15,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingTop: Platform.OS === "ios" ? 50 : 20,
     zIndex: 10,
   },
   backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 8,
-    backgroundColor: 'rgba(0,0,0,0.1)',
+    backgroundColor: "rgba(0,0,0,0.1)",
   },
   backButtonText: {
     marginLeft: 8,
     fontSize: 16,
-    fontFamily: 'Mulish-Medium',
-    color: '#ededed',
+    fontFamily: "Mulish-Medium",
+    color: "#ededed",
   },
   centeredContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingVertical: 20,
   },
   headerSection: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 40,
     paddingHorizontal: 20,
   },
   elsLogo: {
     fontSize: 48,
-    fontFamily: 'Mulish-Bold',
-    color: '#4CC2FF',
+    fontFamily: "Mulish-Bold",
+    color: "#4CC2FF",
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
   centeredHeading: {
     fontSize: 24,
-    fontFamily: 'Mulish-Bold',
-    color: '#ededed',
-    textAlign: 'center',
+    fontFamily: "Mulish-Bold",
+    color: "#ededed",
+    textAlign: "center",
     marginBottom: 20,
   },
   inputContainer: {
@@ -260,21 +261,21 @@ const localStyles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontFamily: 'Mulish-Medium',
+    fontFamily: "Mulish-Medium",
     marginBottom: 8,
-    color: '#ededed',
+    color: "#ededed",
   },
   forgotPasswordButton: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 15,
   },
   forgotPasswordText: {
     fontSize: 14,
-    fontFamily: 'Mulish-Medium',
-    color: '#4CC2FF',
+    fontFamily: "Mulish-Medium",
+    color: "#4CC2FF",
   },
   linkText: {
-    color: '#4CC2FF',
-    fontFamily: 'Mulish-Bold',
+    color: "#4CC2FF",
+    fontFamily: "Mulish-Bold",
   },
 });

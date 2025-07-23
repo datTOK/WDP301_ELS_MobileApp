@@ -17,7 +17,13 @@ import { useToast } from "../context/ToastContext";
 import LoadingSpinner from "../components/LoadingSpinner";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-import { courseService, userLessonService, testService, userCourseService, apiUtils } from "../services";
+import {
+  courseService,
+  userLessonService,
+  testService,
+  userCourseService,
+  apiUtils,
+} from "../services";
 
 const { width } = Dimensions.get("window");
 
@@ -25,7 +31,7 @@ const CourseOverviewScreen = ({ route, navigation }) => {
   const { showError, showSuccess, showWarning } = useToast();
   const { courseId } = route.params;
   const { userToken, user } = useAuth();
-  
+
   // State management
   const [courseInfo, setCourseInfo] = useState({
     title: "",
@@ -63,9 +69,12 @@ const CourseOverviewScreen = ({ route, navigation }) => {
   // Map course levels to difficulty
   const getCourseDifficulty = (level) => {
     const levelMap = {
-      A1: "Beginner", A2: "Beginner",
-      B1: "Intermediate", B2: "Intermediate", 
-      C1: "Advanced", C2: "Advanced"
+      A1: "Beginner",
+      A2: "Beginner",
+      B1: "Intermediate",
+      B2: "Intermediate",
+      C1: "Advanced",
+      C2: "Advanced",
     };
     return levelMap[level] || "Not Available";
   };
@@ -73,15 +82,16 @@ const CourseOverviewScreen = ({ route, navigation }) => {
   // Main data fetching function
   const fetchData = useCallback(async () => {
     if (!user?._id) return;
-    
+
     setLoading(!refreshing);
     setError(null);
-    
+
     try {
       // Check enrollment status first
       let enrollmentStatus = false;
       try {
-        const enrollmentResponse = await userCourseService.getUserCourseByCourseId(courseId);
+        const enrollmentResponse =
+          await userCourseService.getUserCourseByCourseId(courseId);
         // The API returns { data: { userCourse: {...} } } or { data: null } if not enrolled
         enrollmentStatus = !!enrollmentResponse.userCourse;
         setIsEnrolled(enrollmentStatus);
@@ -103,8 +113,12 @@ const CourseOverviewScreen = ({ route, navigation }) => {
 
       // Set basic course info with fallback values
       setCourseInfo({
-        title: courseResponse.course.name || courseResponse.course.title || "Untitled Course",
-        description: courseResponse.course.description || "No description available",
+        title:
+          courseResponse.course.name ||
+          courseResponse.course.title ||
+          "Untitled Course",
+        description:
+          courseResponse.course.description || "No description available",
         difficulty: getCourseDifficulty(courseResponse.course.level),
         numLessons: lessonsResponse.data.length || 0,
         totalTests: testsResponse.data.length || 0,
@@ -119,7 +133,6 @@ const CourseOverviewScreen = ({ route, navigation }) => {
       } else {
         setCompletedLessons(0);
       }
-
     } catch (err) {
       const errorInfo = apiUtils.handleError(err);
       setError(errorInfo.message);
@@ -134,9 +147,11 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     try {
       const completionPromises = courseLessons.map(async (lesson) => {
         try {
-          const response = await userLessonService.getUserLessonByLessonId(lesson._id);
-          const result = apiUtils.parseResponse(response);
-          return result.data?.userLesson?.status === "completed";
+          const response = await userLessonService.getUserLessonByLessonId(
+            lesson._id
+          );
+
+          return response?.userLesson?.status === "completed";
         } catch (error) {
           return false;
         }
@@ -170,7 +185,7 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     setEnrollLoading(true);
     try {
       const response = await userCourseService.enrollCourse(user._id, courseId);
-      
+
       // The API returns { data: { userCourse: {...} } }
       if (response.data && response.data.userCourse) {
         setIsEnrolled(true);
@@ -185,7 +200,10 @@ const CourseOverviewScreen = ({ route, navigation }) => {
       if (errorInfo.status === 409) {
         // User is already enrolled - update state and show info message
         setIsEnrolled(true);
-        showSuccess("Already Enrolled", "You are already enrolled in this course!");
+        showSuccess(
+          "Already Enrolled",
+          "You are already enrolled in this course!"
+        );
         fetchData(); // Refresh data to show enrolled state
       } else {
         showError(errorInfo.message || "Failed to enroll in course");
@@ -210,9 +228,11 @@ const CourseOverviewScreen = ({ route, navigation }) => {
   if (error) {
     return (
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.errorContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           <View style={styles.errorIcon}>
             <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
@@ -220,7 +240,12 @@ const CourseOverviewScreen = ({ route, navigation }) => {
           <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchData}>
-            <Ionicons name="refresh" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Ionicons
+              name="refresh"
+              size={20}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -229,8 +254,14 @@ const CourseOverviewScreen = ({ route, navigation }) => {
   }
 
   // Calculate progress
-  const canTakeTests = isEnrolled && completedLessons === courseInfo.numLessons && courseInfo.numLessons > 0;
-  const progressPercentage = courseInfo.numLessons > 0 ? (completedLessons / courseInfo.numLessons) * 100 : 0;
+  const canTakeTests =
+    isEnrolled &&
+    completedLessons === courseInfo.numLessons &&
+    courseInfo.numLessons > 0;
+  const progressPercentage =
+    courseInfo.numLessons > 0
+      ? (completedLessons / courseInfo.numLessons) * 100
+      : 0;
 
   return (
     <View style={styles.container}>
@@ -238,7 +269,9 @@ const CourseOverviewScreen = ({ route, navigation }) => {
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Back Button */}
         <TouchableOpacity
@@ -262,7 +295,9 @@ const CourseOverviewScreen = ({ route, navigation }) => {
             <View style={styles.headerOverlay}>
               <View style={styles.difficultyBadge}>
                 <Ionicons name="star" size={14} color="#fff" />
-                <Text style={styles.difficultyText}>{courseInfo.difficulty}</Text>
+                <Text style={styles.difficultyText}>
+                  {courseInfo.difficulty}
+                </Text>
               </View>
               <Text style={styles.courseTitle} numberOfLines={2}>
                 {courseInfo.title}
@@ -275,20 +310,31 @@ const CourseOverviewScreen = ({ route, navigation }) => {
         <Card containerStyle={styles.descriptionCard}>
           <Text style={styles.descriptionTitle}>About This Course</Text>
           <Text style={styles.descriptionText}>{courseInfo.description}</Text>
-          
+
           <View style={styles.courseMetrics}>
             <View style={styles.metricItem}>
               <Ionicons name="book-outline" size={20} color="#4CC2FF" />
-              <Text style={styles.metricText}>{courseInfo.numLessons} Lessons</Text>
+              <Text style={styles.metricText}>
+                {courseInfo.numLessons} Lessons
+              </Text>
             </View>
             <View style={styles.metricItem}>
               <Ionicons name="help-circle-outline" size={20} color="#FF9500" />
-              <Text style={styles.metricText}>{courseInfo.totalTests} Tests</Text>
+              <Text style={styles.metricText}>
+                {courseInfo.totalTests} Tests
+              </Text>
             </View>
             <View style={styles.metricItem}>
               <Ionicons name="time-outline" size={20} color="#10D876" />
               <Text style={styles.metricText}>
-                ~{courseInfo.numLessons * (courseInfo.difficulty === "Beginner" ? 15 : courseInfo.difficulty === "Intermediate" ? 30 : 45)}min
+                ~
+                {courseInfo.numLessons *
+                  (courseInfo.difficulty === "Beginner"
+                    ? 15
+                    : courseInfo.difficulty === "Intermediate"
+                    ? 30
+                    : 45)}
+                min
               </Text>
             </View>
           </View>
@@ -299,15 +345,22 @@ const CourseOverviewScreen = ({ route, navigation }) => {
           <Card containerStyle={styles.progressCard}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressTitle}>Your Progress</Text>
-              <Text style={styles.progressPercentage}>{Math.round(progressPercentage)}%</Text>
+              <Text style={styles.progressPercentage}>
+                {Math.round(progressPercentage)}%
+              </Text>
             </View>
-            
+
             <View style={styles.progressBarContainer}>
               <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${progressPercentage}%` },
+                  ]}
+                />
               </View>
             </View>
-            
+
             <Text style={styles.progressText}>
               {completedLessons} of {courseInfo.numLessons} lessons completed
             </Text>
@@ -318,7 +371,9 @@ const CourseOverviewScreen = ({ route, navigation }) => {
                 <Text style={styles.statLabel}>Completed</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{courseInfo.numLessons - completedLessons}</Text>
+                <Text style={styles.statNumber}>
+                  {courseInfo.numLessons - completedLessons}
+                </Text>
                 <Text style={styles.statLabel}>Remaining</Text>
               </View>
               <View style={styles.statItem}>
@@ -333,12 +388,17 @@ const CourseOverviewScreen = ({ route, navigation }) => {
         <Card containerStyle={styles.actionCard}>
           {!isEnrolled ? (
             <View style={styles.enrollmentSection}>
-              <Text style={styles.enrollmentTitle}>Ready to Start Learning?</Text>
+              <Text style={styles.enrollmentTitle}>
+                Ready to Start Learning?
+              </Text>
               <Text style={styles.enrollmentText}>
                 Enroll now to access all lessons, tests, and track your progress
               </Text>
               <TouchableOpacity
-                style={[styles.enrollButton, enrollLoading && styles.disabledButton]}
+                style={[
+                  styles.enrollButton,
+                  enrollLoading && styles.disabledButton,
+                ]}
                 onPress={enrollInCourse}
                 disabled={enrollLoading}
               >
@@ -368,7 +428,10 @@ const CourseOverviewScreen = ({ route, navigation }) => {
 
               {courseInfo.totalTests > 0 && (
                 <TouchableOpacity
-                  style={[styles.secondaryButton, !canTakeTests && styles.disabledButton]}
+                  style={[
+                    styles.secondaryButton,
+                    !canTakeTests && styles.disabledButton,
+                  ]}
                   onPress={() => {
                     if (canTakeTests) {
                       navigation.navigate("TestScreen", {
@@ -384,7 +447,12 @@ const CourseOverviewScreen = ({ route, navigation }) => {
                   }}
                   disabled={!canTakeTests}
                 >
-                  <Text style={[styles.buttonText, !canTakeTests && styles.disabledButtonText]}>
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      !canTakeTests && styles.disabledButtonText,
+                    ]}
+                  >
                     {canTakeTests ? "Take Tests" : "Tests Locked"}
                   </Text>
                 </TouchableOpacity>
@@ -396,28 +464,32 @@ const CourseOverviewScreen = ({ route, navigation }) => {
         {/* Course Details */}
         <Card containerStyle={styles.detailsCard}>
           <Text style={styles.detailsTitle}>Course Information</Text>
-          
+
           <View style={styles.detailsList}>
             <View style={styles.detailItem}>
               <Ionicons name="calendar-outline" size={18} color="#4CC2FF" />
               <Text style={styles.detailLabel}>Published:</Text>
               <Text style={styles.detailValue}>
-                {courseInfo.createdAt ? new Date(courseInfo.createdAt).toLocaleDateString() : "N/A"}
+                {courseInfo.createdAt
+                  ? new Date(courseInfo.createdAt).toLocaleDateString()
+                  : "N/A"}
               </Text>
             </View>
-            
+
             <View style={styles.detailItem}>
               <Ionicons name="trending-up-outline" size={18} color="#10D876" />
               <Text style={styles.detailLabel}>Level:</Text>
-              <Text style={styles.detailValue}>{courseInfo.level || "Not specified"}</Text>
+              <Text style={styles.detailValue}>
+                {courseInfo.level || "Not specified"}
+              </Text>
             </View>
-            
+
             <View style={styles.detailItem}>
               <Ionicons name="language-outline" size={18} color="#FF9500" />
               <Text style={styles.detailLabel}>Language:</Text>
               <Text style={styles.detailValue}>English</Text>
             </View>
-            
+
             <View style={styles.detailItem}>
               <Ionicons name="people-outline" size={18} color="#9C27B0" />
               <Text style={styles.detailLabel}>Format:</Text>
@@ -486,12 +558,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "600",
-    fontFamily: 'Mulish-SemiBold',
+    fontFamily: "Mulish-SemiBold",
     marginLeft: 4,
   },
   courseTitle: {
     fontSize: 24,
-    fontFamily: 'Mulish-Bold',
+    fontFamily: "Mulish-Bold",
     color: "#fff",
     lineHeight: 30,
   },
@@ -512,14 +584,14 @@ const styles = StyleSheet.create({
   },
   descriptionTitle: {
     fontSize: 18,
-    fontFamily: 'Mulish-Bold',
+    fontFamily: "Mulish-Bold",
     color: "#fff",
     marginBottom: 12,
   },
   descriptionText: {
     fontSize: 15,
     color: "#CCC",
-    fontFamily: 'Mulish-Regular',
+    fontFamily: "Mulish-Regular",
     lineHeight: 22,
     marginBottom: 20,
   },
@@ -539,7 +611,7 @@ const styles = StyleSheet.create({
   metricText: {
     fontSize: 13,
     color: "#AAA",
-    fontFamily: 'Mulish-Medium',
+    fontFamily: "Mulish-Medium",
     marginLeft: 6,
     fontWeight: "500",
   },
@@ -566,12 +638,12 @@ const styles = StyleSheet.create({
   },
   progressTitle: {
     fontSize: 18,
-    fontFamily: 'Mulish-Bold',
+    fontFamily: "Mulish-Bold",
     color: "#fff",
   },
   progressPercentage: {
     fontSize: 24,
-    fontFamily: 'Mulish-Bold',
+    fontFamily: "Mulish-Bold",
     color: "#4CC2FF",
   },
   progressBarContainer: {
@@ -591,7 +663,7 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 14,
     color: "#AAA",
-    fontFamily: 'Mulish-Regular',
+    fontFamily: "Mulish-Regular",
     marginBottom: 20,
   },
   progressStats: {
@@ -607,14 +679,14 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 20,
-    fontFamily: 'Mulish-Bold',
+    fontFamily: "Mulish-Bold",
     color: "#fff",
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
     color: "#AAA",
-    fontFamily: 'Mulish-Medium',
+    fontFamily: "Mulish-Medium",
     textAlign: "center",
   },
 
@@ -638,7 +710,7 @@ const styles = StyleSheet.create({
   },
   enrollmentTitle: {
     fontSize: 20,
-    fontFamily: 'Mulish-Bold',
+    fontFamily: "Mulish-Bold",
     color: "#fff",
     marginBottom: 8,
     textAlign: "center",
@@ -646,7 +718,7 @@ const styles = StyleSheet.create({
   enrollmentText: {
     fontSize: 15,
     color: "#AAA",
-    fontFamily: 'Mulish-Regular',
+    fontFamily: "Mulish-Regular",
     textAlign: "center",
     marginBottom: 24,
     lineHeight: 20,
