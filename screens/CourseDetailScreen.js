@@ -11,16 +11,14 @@ import {
   Alert,
   Platform,
   Modal,
+  RefreshControl,
 } from "react-native";
 import { Card, Button, Icon, Overlay, Chip } from "react-native-elements";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import LoadingSpinner from "../components/LoadingSpinner";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import prettyFormat from "pretty-format";
-import axios from "axios";
-import { lessonService, userLessonService, userExerciseService, testService, apiUtils } from "../services";
+import { lessonService, userLessonService, userExerciseService, exerciseService, testService, apiUtils } from "../services";
 
 const ExerciseItem = ({
   exercise,
@@ -39,7 +37,7 @@ const ExerciseItem = ({
   const [feedbackExplanation, setFeedbackExplanation] = useState("");
 
   const { userToken } = useAuth();
-  const { showError, showSuccess, showWarning } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
 
   // Reset exercise state when exercise changes
   useEffect(() => {
@@ -75,7 +73,7 @@ const ExerciseItem = ({
 
   const checkAnswer = async () => {
     if (!userAnswer.trim() && !selectedOption) {
-      showError('Error', 'Please provide an answer before submitting.');
+      showError('Please provide an answer before submitting.');
       return;
     }
 
@@ -138,7 +136,7 @@ const ExerciseItem = ({
       }
     } catch (error) {
       const errorInfo = apiUtils.handleError(error);
-      showError('Error', errorInfo.message);
+      showError(errorInfo.message);
       // Show local validation result even if API fails
       if (onExerciseCompleted) {
         onExerciseCompleted(exercise._id, isAnswerCorrect);
@@ -342,20 +340,18 @@ const ExerciseItem = ({
 };
 
 const CourseDetailScreen = ({ route, navigation }) => {
-  const { courseId, lessonId, lessonName, updateLessonStatus } = route.params;
-  // console.log("Course ID: ", courseId);
-  // console.log("Lesson ID: ", lessonId);
-  // console.log("Lesson Name: ", lessonName);
-  // console.log("Update Lesson Status: ", updateLessonStatus);
+  const { courseId, lessonId, lessonName } = route.params;
   const { userToken, user } = useAuth();
   const [activeTab, setActiveTab] = useState("vocabulary");
   const [lesson, setLesson] = useState(null);
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [completedExercises, setCompletedExercises] = useState({});
   const [completedLessons, setCompletedLessons] = useState([]);
   const [userLesson, setUserLesson] = useState(null);
+  const { showError, showSuccess, showWarning } = useToast();
 
   // State for modal navigation
   const [modalVisible, setModalVisible] = useState(false);
@@ -399,143 +395,105 @@ const CourseDetailScreen = ({ route, navigation }) => {
     return correctExercises === totalExercises;
   };
 
-  // Create user lesson record
-  const createUserLesson = async () => {
-    try {
-      const response = await userLessonService.createUserLesson({
-        userId: user._id,
-        lessonId: lessonId,
-      });
-
-      console.log("Create user lesson response status:", response.status);
-      const result = apiUtils.parseResponse(response);
-      console.log("Create user lesson response data:", result);
-
-      if (result.data) {
-        console.log("User lesson created successfully");
-        return true;
-      } else {
-        console.log("Failed to create user lesson:", result.message);
-        // Don't throw error here as the lesson might already exist
-        return false;
-      }
-    } catch (error) {
-      console.log("Error creating user lesson:", error);
-      // Don't throw error here as the lesson might already exist
-      return false;
-    }
-  };
-
   // Mark lesson as completed (only if all exercises are correct)
   const markLessonCompleted = async (lessonId) => {
     console.log("Lesson ID: ", lessonId);
 
     // Check if lesson is already completed from API
     if (userLesson?.completed) {
-      showWarning('Already Completed', 'This lesson has already been completed. You can review the content but cannot mark it as completed again.');
+      showWarning('This lesson has already been completed. You can review the content but cannot mark it as completed again.');
       return;
     }
 
     if (!isLessonFullyCompleted()) {
-      showWarning('Incomplete', 'Please complete all exercises correctly before marking this lesson as completed.');
+      showWarning('Please complete all exercises correctly before marking this lesson as completed.');
       return;
     }
 
-    if (updateLessonStatus) {
-      const success = await updateLessonStatus(lessonId, "completed");
-      if (success) {
-        setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-        showSuccess('Success', 'Lesson completed! You can now proceed to the next lesson.');
-      } else {
-        showError('Error', 'Failed to update lesson status. Please try again.');
+    try {
+      // Get the user lesson record first
+      const lessonResponse = await userLessonService.getUserLessonByLessonId(lessonId);
+      console.log(lessonResponse)
+      if (!lessonResponse.userLesson?._id) {
+        showError('Unable to update lesson progress. Please try again.');
+        return;
       }
-    } else {
-      setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
-      showSuccess('Success', 'Lesson completed! You can now proceed to the next lesson.');
+
+      // Update the lesson status to completed
+      const response = await userLessonService.updateUserLessonStatus(
+        lessonResponse.userLesson._id,
+        "completed"
+      );
+
+      if (response && response.userLesson) {
+        // Update local state
+        setCompletedLessons((prev) => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+        setUserLesson(prev => ({ ...prev, completed: true, status: "completed" }));
+        showSuccess('Lesson completed! You can now proceed to the next lesson.');
+      } else {
+        showError('Failed to update lesson status. Please try again.');
+      }
+    } catch (error) {
+      console.log("Error updating lesson status:", error);
+      showError('Failed to update lesson progress. Please try again.');
     }
   };
 
   // Fetch or create user lesson record, then fetch userLesson data
-  const fetchOrCreateUserLesson = async () => {
+  const fetchLessonDetails = async () => {
+    setLoading(!refreshing);
+    setError(null);
     try {
-      // Try to fetch userLesson first
+      console.log("Fetching lesson details for lessonId:", lessonId);
+
+      // Just fetch userLesson (do not create)
       try {
         const response = await userLessonService.getUserLessonByLessonId(lessonId);
         const result = apiUtils.parseResponse(response);
         setUserLesson(result.data.userLesson || null);
-        return result.data.userLesson;
       } catch (error) {
-        // If not found, create it
-        const createResponse = await userLessonService.createUserLesson({
-          userId: user._id,
-          lessonId: lessonId,
-        });
-        const result = apiUtils.parseResponse(createResponse);
-        if (result.data) {
-          setUserLesson(result.data.userLesson || null);
-          return result.data.userLesson;
-        } else {
-          setUserLesson(null);
-          return null;
-        }
+        setUserLesson(null);
       }
-    } catch (error) {
-      console.log("Error in fetchOrCreateUserLesson:", error);
-      setUserLesson(null);
-      return null;
-    }
-  };
 
-  const fetchLessonDetails = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      console.log("Fetching lesson details for lessonId:", lessonId);
-      console.log("Using userToken:", userToken ? "Token exists" : "No token");
-
-      // First, fetch or create user lesson record and get userLesson data
-      await fetchOrCreateUserLesson();
-
-      const [
-        lessonResponse,
-        grammarResponse,
-        vocabResponse,
-        exerciseResponse,
-        testsResponse,
-      ] = await Promise.all([
-        lessonService.getLessonById(lessonId),
-        lessonService.getLessonGrammars(lessonId),
-        lessonService.getLessonVocabulary(lessonId),
-        lessonService.getLessonExercises(lessonId),
-        testService.getTestsByCourseId(courseId),
-      ]);
-
-      const lessonData = apiUtils.parseResponse(lessonResponse);
-      const grammarData = apiUtils.parseResponse(grammarResponse);
-      const vocabData = apiUtils.parseResponse(vocabResponse);
-      const exerciseData = apiUtils.parseResponse(exerciseResponse);
-      const testsData = apiUtils.parseResponse(testsResponse);
-
-      if (
-        !lessonData.data ||
-        !grammarData.data ||
-        !vocabData.data ||
-        !exerciseData.data ||
-        !testsData.data
-      ) {
+      // Fetch lesson data sequentially
+      const lessonResponse = await lessonService.getLessonById(lessonId);
+      
+      if (!lessonResponse) {
         throw new Error("Failed to fetch lesson details");
       }
+      
+      const grammarResponse = await lessonService.getLessonGrammars(lessonId);
+      
+      if (!grammarResponse) {
+        throw new Error("Failed to fetch grammar details");
+      }
+      
+      const vocabResponse = await lessonService.getLessonVocabulary(lessonId);
+      
+      if (!vocabResponse) {
+        throw new Error("Failed to fetch vocabulary details");
+      }
+      
+      const exerciseResponse = await exerciseService.getExercisesByLessonId(lessonId);
+      
+      if (!exerciseResponse) {
+        throw new Error("Failed to fetch exercise details");
+      }
+      
+      const testsResponse = await testService.getTestsByCourseId(courseId);
+      
+      if (!testsResponse) {
+        throw new Error("Failed to fetch test details");
+      }
 
-      if (exerciseData.data && exerciseData.data.length > 0) {
+      if (exerciseResponse.data && exerciseResponse.data.length > 0) {
         const progress = {};
         await Promise.all(
-          exerciseData.data.map(async (e) => {
+          exerciseResponse.data.map(async (e) => {
             try {
-              const response = await axios.get(
-                `${MOBILE_SERVER_URL}api/user-exercises/${e._id.toString()}/exercise`
-              );
-              const userExercise = response.data.userExercise;
-              progress[e._id] = userExercise.completed === true;
+              const response = await userExerciseService.getUserExerciseByExerciseId(e._id);
+              const userExercise = response.userExercise;
+              progress[e._id] = userExercise.completed === true;            
             } catch (err) {
               progress[e._id] = false;
             }
@@ -544,19 +502,28 @@ const CourseDetailScreen = ({ route, navigation }) => {
         setCompletedExercises(progress);
       }
       const lessonWithDetails = {
-        ...lessonData.data,
-        grammars: grammarData.data || [],
-        vocabularies: vocabData.data || [],
-        exercises: exerciseData.data || [],
+        ...lessonResponse,
+        grammars: grammarResponse.data || [],
+        vocabularies: vocabResponse.data || [],
+        exercises: exerciseResponse.data || [],
       };
 
       setLesson(lessonWithDetails);
-      setTests(testsData.data || []);
+      setTests(testsResponse.data || []);
     } catch (err) {
-      setError(err.message);
+      const errorInfo = apiUtils.handleError(err);
+      setError(errorInfo.message || "Failed to load lesson details. Please try again later.");
+      showError(errorInfo.message || "Failed to load lesson details. Please try again later.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  // Handle refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchLessonDetails();
   };
 
   useEffect(() => {
@@ -617,7 +584,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
               onPress={() => openModal(type, idx)}
             >
               <View style={styles.itemContent}>
-                <View style={styles.itemLeft}>
+              <View style={styles.itemLeft}>
                   <View style={[styles.itemIcon]}>
                     <Ionicons name={"play"} size={16} color={"#2563EB"} />
                   </View>
@@ -637,15 +604,16 @@ const CourseDetailScreen = ({ route, navigation }) => {
           ))}
         </>
       ) : (
-        <Text>No content available</Text>
+        <Text style={styles.itemText}>No content available</Text>
       )}
     </>
   );
+  
   const renderTabs = (activeTab, setActiveTab, tabData = []) => {
     const tabs = [
-      { key: "grammar", label: "Grammar", icon: "📝" },
-      { key: "vocabulary", label: "Vocabulary", icon: "📚" },
-      { key: "practice", label: "Practice", icon: "🎯" },
+      { key: "grammar", label: "Grammar", icon: "book-outline" },
+      { key: "vocabulary", label: "Vocabulary", icon: "library-outline" },
+      { key: "practice", label: "Practice", icon: "fitness-outline" },
     ];
 
     return (
@@ -667,8 +635,13 @@ const CourseDetailScreen = ({ route, navigation }) => {
               ]}
               activeOpacity={0.7}
             >
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text style={{ fontSize: 16, marginRight: 6 }}>{tab.icon}</Text>
+              <View style={enhancedTabStyles.tabContent}>
+                <Ionicons 
+                  name={tab.icon} 
+                  size={18} 
+                  color={isActive ? "#fff" : "#b0b8c1"} 
+                  style={{ marginRight: 6 }} 
+                />
                 <Text
                   style={[
                     enhancedTabStyles.tabText,
@@ -696,7 +669,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
   // Render modal content for the selected item
   const renderModalContent = () => {
     if (!modalType || !lesson) {
-      return <Text style={{ color: "#fff" }}>No content available</Text>;
+      return <Text style={styles.itemText}>No content available</Text>;
     }
     let items = [];
 
@@ -704,7 +677,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
     if (modalType === "vocab") items = lesson.vocabularies;
     if (modalType === "exercise") items = lesson.exercises;
     if (!items[modalIndex]) {
-      return <Text style={{ color: "#fff" }}>No content available</Text>;
+      return <Text style={styles.itemText}>No content available</Text>;
     }
 
     const item = items[modalIndex];
@@ -754,16 +727,16 @@ const CourseDetailScreen = ({ route, navigation }) => {
           </View>
           {modalType === "grammar" && (
             <View style={styles.modalBody}>
-              <Text style={styles.itemText}>Structure: {item.structure}</Text>
-              <Text style={styles.itemText}>Example: {item.example}</Text>
-              <Text style={styles.itemText}>
+              <Text style={[styles.itemText, { color: "#fff" }]}>Structure: {item.structure}</Text>
+              <Text style={[styles.itemText, { color: "#fff" }]}>Example: {item.example}</Text>
+              <Text style={[styles.itemText, { color: "#fff" }]}>
                 Explanation: {item.explanation}
               </Text>
             </View>
           )}
           {modalType === "vocab" && (
             <View style={styles.modalBody}>
-              <Text style={styles.itemText}>
+              <Text style={[styles.itemText, { color: "#fff" }]}>
                 Vietnamese: {item.vietnameseContent}
               </Text>
               {item.imageUrl && (
@@ -797,7 +770,9 @@ const CourseDetailScreen = ({ route, navigation }) => {
       style={styles.lessonContentContainer}
       contentContainerStyle={styles.lessonContentScrollContainer}
       showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
+      {/* Lesson Completed Banner Section */}
       {userLesson?.completed && (
         <View style={styles.lessonCompletedBanner}>
           <Ionicons name="checkmark-circle" size={24} color="#fff" />
@@ -806,6 +781,8 @@ const CourseDetailScreen = ({ route, navigation }) => {
           </Text>
         </View>
       )}
+
+      {/* Main Content Section */}
       <Card containerStyle={styles.cardDark}>
         {renderTabs(activeTab, setActiveTab)}
         {activeTab === "vocabulary" &&
@@ -846,24 +823,37 @@ const CourseDetailScreen = ({ route, navigation }) => {
           </View>
         )}
       </Card>
-      <Button
-        title={
-          userLesson?.completed
-            ? "Lesson Completed"
-            : isLessonFullyCompleted()
-            ? "Mark as Completed"
-            : "Complete All Exercises"
-        }
-        buttonStyle={
-          userLesson?.completed
-            ? styles.completedButton
+
+      {/* Action Button Section */}
+      <TouchableOpacity
+        style={[
+          userLesson?.completed 
+            ? styles.completedButton 
             : isLessonFullyCompleted()
             ? styles.completeButton
             : styles.incompleteButton
-        }
+        ]}
         onPress={() => markLessonCompleted(lessonId)}
         disabled={userLesson?.completed || !isLessonFullyCompleted()}
-      />
+      >
+        <Text
+          style={[
+            userLesson?.completed 
+              ? styles.completedButtonText 
+              : isLessonFullyCompleted()
+              ? styles.completeButtonText
+              : styles.incompleteButtonText
+          ]}
+        >
+          {userLesson?.completed
+            ? "Lesson Completed"
+            : isLessonFullyCompleted()
+            ? "Mark as Completed"
+            : "Complete All Exercises"}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Modal Section */}
       {Platform.OS === "web" ? (
         <Overlay
           isVisible={modalVisible}
@@ -882,7 +872,6 @@ const CourseDetailScreen = ({ route, navigation }) => {
         >
           <View style={styles.nativeModalOverlay}>
             <View style={styles.nativeModalContainer}>
-              {/* Add a test here */}
               {renderModalContent()}
             </View>
           </View>
@@ -891,38 +880,40 @@ const CourseDetailScreen = ({ route, navigation }) => {
     </ScrollView>
   );
 
-  if (loading) {
+  if (loading && !refreshing) {
     return <LoadingSpinner fullScreen text="Loading lesson..." />;
   }
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={50} color="#ff6b6b" />
-        <Text style={styles.errorText}>{error}</Text>
-        <Button
-          title="Retry"
-          onPress={fetchLessonDetails}
-          buttonStyle={styles.retryButton}
-          titleStyle={styles.retryButtonText}
-        />
+      <View style={styles.container}>
+        <ScrollView 
+          contentContainerStyle={styles.errorContainer}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          <View style={styles.errorIcon}>
+            <Ionicons name="alert-circle-outline" size={64} color="#FF6B6B" />
+          </View>
+          <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchLessonDetails}>
+            <Ionicons name="refresh" size={20} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
     );
   }
 
   return (
-    <View style={styles.containerLight}>
-      {/* Header */}
-      <View style={styles.headerDark}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitleDark}>{lessonName}</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <View style={styles.container}>
+      {/* Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <Ionicons name="arrow-back" size={24} color="#fff" />
+      </TouchableOpacity>
 
       {/* Content */}
       {lesson && renderLessonContent()}
@@ -931,6 +922,11 @@ const CourseDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  // Main container (dark background)
+  container: {
+    flex: 1,
+    backgroundColor: "#1A1A1A",
+  },
   // Main app container (light background)
   containerLight: {
     flex: 1,
@@ -944,10 +940,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#23272f",
     borderColor: "#23272f",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
     maxWidth: "100%",
   },
   // Header (dark)
@@ -978,8 +974,13 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
   },
   backButton: {
+    position: "absolute",
+    top: 24,
+    left: 16,
+    zIndex: 10,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 20,
     padding: 8,
-    marginLeft: -8,
   },
   headerTitleDark: {
     fontSize: 20,
@@ -998,11 +999,13 @@ const styles = StyleSheet.create({
   },
   lessonContentContainer: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#1A1A1A",
     width: "100%",
   },
   lessonContentScrollContainer: {
     flexGrow: 1,
+    paddingTop: 80,
+    paddingBottom: 20,
   },
   description: {
     fontSize: 14,
@@ -1039,12 +1042,12 @@ const styles = StyleSheet.create({
   itemTitleLight: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#23272f",
+    color: "#fff",
     marginBottom: 2,
   },
   itemText: {
-    fontSize: 14,
-    color: "#ccc",
+    fontSize: 16,
+    color: "#AAA",
     marginTop: 5,
   },
   image: {
@@ -1067,25 +1070,39 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 20,
+    backgroundColor: "#1A1A1A",
+    padding: 32,
+  },
+  errorIcon: {
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 22,
+    color: "#fff",
+    marginBottom: 8,
+    textAlign: "center",
+    fontFamily: "Mulish-Bold",
   },
   errorText: {
-    color: "#ff6b6b",
+    color: "#AAA",
     fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: "center",
+    lineHeight: 24,
+    fontFamily: "Mulish-Regular",
   },
   retryButton: {
-    backgroundColor: "#007bff",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4CC2FF",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontFamily: "Mulish-SemiBold",
   },
   testSection: {
     marginTop: 20,
@@ -1093,9 +1110,9 @@ const styles = StyleSheet.create({
   },
   testSectionTitle: {
     fontSize: 20,
-    fontWeight: "bold",
     marginBottom: 10,
     color: "#333",
+    fontFamily: "Mulish-Bold",
   },
   testCard: {
     borderRadius: 10,
@@ -1110,19 +1127,21 @@ const styles = StyleSheet.create({
   },
   testTitle: {
     fontSize: 18,
-    fontWeight: "bold",
     marginBottom: 5,
     color: "#fff",
+    fontFamily: "Mulish-Bold",
   },
   testDescription: {
     fontSize: 14,
     color: "#ccc",
     marginBottom: 10,
+    fontFamily: "Mulish-Regular",
   },
   testInfo: {
     fontSize: 16,
     marginBottom: 10,
     color: "#ccc",
+    fontFamily: "Mulish-Regular",
   },
   testButton: {
     backgroundColor: "#28a745",
@@ -1131,7 +1150,7 @@ const styles = StyleSheet.create({
   testButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   textInput: {
     backgroundColor: "#444",
@@ -1188,7 +1207,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   itemButtonLight: {
-    backgroundColor: "#fff",
+    backgroundColor: "#2b2b2b",
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 16,
@@ -1199,7 +1218,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#333",
   },
   itemButtonDark: {
     padding: 12,
@@ -1248,7 +1267,7 @@ const styles = StyleSheet.create({
   },
   itemStatus: {
     fontSize: 13,
-    color: "#6B7280",
+    color: "#AAA",
     fontWeight: "500",
   },
   lockedText: {
@@ -1264,10 +1283,10 @@ const styles = StyleSheet.create({
   },
   chipSectionTitle: {
     fontSize: 16,
-    fontWeight: "bold",
     color: "#bbb",
     marginBottom: 8,
     textAlign: "center",
+    fontFamily: "Mulish-Bold",
   },
   chipRow: {
     flexDirection: "row",
@@ -1282,7 +1301,7 @@ const styles = StyleSheet.create({
   },
   chipTitle: {
     color: "#fff",
-    fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   modalOverlay: {
     width: "90%",
@@ -1317,11 +1336,11 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "bold",
     color: "#fff",
     flex: 1,
     textAlign: "center",
     paddingHorizontal: 10,
+    fontFamily: "Mulish-Bold",
   },
   modalBody: {
     marginBottom: 15,
@@ -1341,9 +1360,10 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 14,
-    color: "#ccc",
+    color: "#AAA",
     marginBottom: 5,
     textAlign: "center",
+    fontFamily: "Mulish-Regular",
   },
   progressBar: {
     height: 8,
@@ -1384,6 +1404,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
   },
+  errorIcon: {
+    marginBottom: 16,
+    opacity: 0.5,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#111827",
+    marginBottom: 8,
+    textAlign: "center",
+  },
 });
 
 // Enhanced and improved tab styles
@@ -1406,7 +1437,7 @@ const enhancedTabStyles = {
     flexDirection: "row",
     backgroundColor: "#181c22",
     borderRadius: 14,
-    padding: 4,
+    padding: 5,
     marginBottom: 18,
     marginHorizontal: 4,
     shadowColor: "#000",
@@ -1423,7 +1454,7 @@ const enhancedTabStyles = {
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 2,
+marginHorizontal: 0.5,
     minHeight: 48,
   },
 
@@ -1458,7 +1489,6 @@ const enhancedTabStyles = {
   // Tab Text - better typography
   tabText: {
     fontSize: 15,
-    fontWeight: "600",
     color: "#b0b8c1",
     textAlign: "center",
     fontFamily: "Mulish-SemiBold",
@@ -1467,7 +1497,6 @@ const enhancedTabStyles = {
   // Active Tab Text
   activeTabText: {
     color: "#fff",
-    fontWeight: "700",
     fontFamily: "Mulish-Bold",
   },
 
@@ -1494,7 +1523,6 @@ const enhancedTabStyles = {
   tabBadgeText: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
   },
 
@@ -1556,7 +1584,6 @@ const enhancedTabStyles = {
   // Item title
   itemTitle: {
     fontSize: 16,
-    fontWeight: "600",
     color: "#111827",
     marginBottom: 2,
     fontFamily: "Mulish-SemiBold",
@@ -1566,7 +1593,6 @@ const enhancedTabStyles = {
   itemSubtitle: {
     fontSize: 13,
     color: "#6B7280",
-    fontWeight: "500",
     fontFamily: "Mulish-Medium",
   },
 
@@ -1586,7 +1612,6 @@ const enhancedTabStyles = {
   startButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "600",
     fontFamily: "Mulish-SemiBold",
   },
 
@@ -1608,7 +1633,6 @@ const enhancedTabStyles = {
     fontSize: 16,
     color: "#6B7280",
     textAlign: "center",
-    fontWeight: "500",
     fontFamily: "Mulish-Medium",
   },
 
@@ -1625,7 +1649,6 @@ const enhancedTabStyles = {
     color: "#9CA3AF",
     textAlign: "center",
     marginBottom: 8,
-    fontWeight: "500",
     fontFamily: "Mulish-Medium",
   },
 
@@ -1656,16 +1679,15 @@ const enhancedTabStyles = {
     marginHorizontal: 12,
     alignItems: "center",
     shadowColor: "#10D876",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 1,
   },
 
   completeButtonText: {
-    color: "#FFFFFF",
+    color: "#E6F0FF",
     fontSize: 16,
-    fontWeight: "600",
     fontFamily: "Mulish-SemiBold",
   },
 
@@ -1676,6 +1698,44 @@ const enhancedTabStyles = {
 
   completeButtonTextDisabled: {
     color: "#D1D5DB",
+  },
+  completedButton: {
+    backgroundColor: "#10D876",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    marginHorizontal: 12,
+    alignItems: "center",
+    shadowColor: "#10D876",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  completedButtonText: {
+    color: "#E6F0FF",
+    fontSize: 16,
+    fontFamily: "Mulish-SemiBold",
+  },
+  incompleteButton: {
+    backgroundColor: "#10D876",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    marginHorizontal: 12,
+    alignItems: "center",
+    shadowColor: "#10D876",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  incompleteButtonText: {
+    color: "#888",
+    fontSize: 16,
+    fontFamily: "Mulish-SemiBold",
   },
 };
 
@@ -1889,7 +1949,6 @@ const exerciseItemStyles = StyleSheet.create({
   },
   answerText: {
     color: "#28a745",
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
   },
   explanationText: {
