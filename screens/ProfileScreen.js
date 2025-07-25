@@ -62,6 +62,7 @@ export default function ProfileScreen({ navigation }) {
       const fetchUserStats = async () => {
         try {
           const userDetail = await userService.getUserDetailById(user._id);
+          console.log("test", userDetail)
           setUserStats(userDetail);
         } catch (statsError) {
           console.error('Error fetching user stats:', statsError);

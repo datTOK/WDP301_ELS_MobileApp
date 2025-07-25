@@ -41,6 +41,7 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     totalTests: 0,
   });
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [userCourseStatus, setUserCourseStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [enrollLoading, setEnrollLoading] = useState(false);
@@ -89,15 +90,20 @@ const CourseOverviewScreen = ({ route, navigation }) => {
     try {
       // Check enrollment status first
       let enrollmentStatus = false;
+      let userCourseData = null;
       try {
         const enrollmentResponse =
           await userCourseService.getUserCourseByCourseId(courseId);
+          console.log(enrollmentResponse)
         // The API returns { data: { userCourse: {...} } } or { data: null } if not enrolled
         enrollmentStatus = !!enrollmentResponse.userCourse;
+        userCourseData = enrollmentResponse.userCourse;
         setIsEnrolled(enrollmentStatus);
+        setUserCourseStatus(userCourseData?.status || null);
       } catch (error) {
         enrollmentStatus = false;
         setIsEnrolled(false);
+        setUserCourseStatus(null);
       }
 
       const courseResponse = await courseService.getCourseById(courseId);
@@ -340,14 +346,39 @@ const CourseOverviewScreen = ({ route, navigation }) => {
           </View>
         </Card>
 
+        {/* Congratulations Card (if course completed) */}
+        {isEnrolled && userCourseStatus === "completed" && (
+          <Card containerStyle={styles.congratulationsCard}>
+            <View style={styles.congratulationsContent}>
+              <View style={styles.congratulationsIcon}>
+                <Ionicons name="trophy" size={32} color="#FFD700" />
+              </View>
+              <View style={styles.congratulationsText}>
+                <Text style={styles.congratulationsTitle}>Congratulations!</Text>
+                <Text style={styles.congratulationsSubtitle}>
+                  You've successfully completed this course
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
+
         {/* Progress Card (if enrolled) */}
         {isEnrolled && (
           <Card containerStyle={styles.progressCard}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressTitle}>Your Progress</Text>
-              <Text style={styles.progressPercentage}>
-                {Math.round(progressPercentage)}%
-              </Text>
+              <View style={styles.progressHeaderRight}>
+                <Text style={styles.progressPercentage}>
+                  {Math.round(progressPercentage)}%
+                </Text>
+                {userCourseStatus === "completed" && (
+                  <View style={styles.completedBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10D876" />
+                    <Text style={styles.completedText}>Completed</Text>
+                  </View>
+                )}
+              </View>
             </View>
 
             <View style={styles.progressBarContainer}>
@@ -495,6 +526,22 @@ const CourseOverviewScreen = ({ route, navigation }) => {
               <Text style={styles.detailLabel}>Format:</Text>
               <Text style={styles.detailValue}>Self-paced</Text>
             </View>
+            {isEnrolled && userCourseStatus && (
+              <View style={styles.detailItem}>
+                <Ionicons 
+                  name={userCourseStatus === "completed" ? "checkmark-circle" : "time"} 
+                  size={18} 
+                  color={userCourseStatus === "completed" ? "#10D876" : "#FF9500"} 
+                />
+                <Text style={styles.detailLabel}>Status:</Text>
+                <Text style={[
+                  styles.detailValue,
+                  { color: userCourseStatus === "completed" ? "#10D876" : "#FF9500" }
+                ]}>
+                  {userCourseStatus === "completed" ? "Completed" : "In Progress"}
+                </Text>
+              </View>
+            )}
           </View>
         </Card>
       </ScrollView>
@@ -639,10 +686,63 @@ const styles = StyleSheet.create({
     fontFamily: "Mulish-Bold",
     color: "#fff",
   },
+  progressHeaderRight: {
+    alignItems: "flex-end",
+  },
   progressPercentage: {
     fontSize: 24,
     fontFamily: "Mulish-Bold",
     color: "#4CC2FF",
+  },
+  completedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(16, 216, 118, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  completedText: {
+    fontSize: 12,
+    fontFamily: "Mulish-SemiBold",
+    color: "#10D876",
+    marginLeft: 4,
+  },
+  // Congratulations Card
+  congratulationsCard: {
+    backgroundColor: "#2b2b2b",
+    borderRadius: 16,
+    margin: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#FFD700",
+  },
+  congratulationsContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  congratulationsIcon: {
+    marginRight: 16,
+    padding: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 50,
+  },
+  congratulationsText: {
+    flex: 1,
+  },
+  congratulationsTitle: {
+    fontSize: 20,
+    fontFamily: "Mulish-Bold",
+    color: "white",
+    marginBottom: 4,
+  },
+  congratulationsSubtitle: {
+    fontSize: 14,
+    fontFamily: "Mulish-Regular",
+    color: "white",
+    opacity: 0.8,
   },
   progressBarContainer: {
     marginBottom: 12,

@@ -1,5 +1,4 @@
-import api from './api';
-import { apiUtils } from './index';
+import api, { apiUtils } from './api';
 
 /**
  * Payment Service

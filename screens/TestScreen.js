@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,16 +8,17 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { createGlobalStyles } from "../utils/globalStyles";
 import LoadingSpinner from "../components/LoadingSpinner";
-import { testService, apiUtils } from "../services";
+import { testService, userTestService, apiUtils } from "../services";
 
 const TestScreen = ({ route }) => {
   const [tests, setTests] = useState([]);
+  const [userTests, setUserTests] = useState({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -28,7 +29,7 @@ const TestScreen = ({ route }) => {
   const { showError } = useToast();
   const globalStyles = createGlobalStyles(theme);
 
-  const fetchTests = async (isRefresh = false) => {
+  const fetchTests = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
     } else {
@@ -44,6 +45,8 @@ const TestScreen = ({ route }) => {
 
       if (result.data && Array.isArray(result.data)) {
         setTests(result.data);
+        // Fetch user test data for each test
+        await fetchUserTestsData(result.data);
       } else {
         setTests([]);
         showError("No tests found for this course.");
@@ -57,66 +60,146 @@ const TestScreen = ({ route }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [route.params?.courseId, showError]);
 
-  useEffect(() => {
-    fetchTests();
+  const fetchUserTestsData = useCallback(async (testList) => {
+    try {
+      const userTestsData = {};
+      
+      for (const test of testList) {
+        try {
+          const userTestResponse = await userTestService.getUserTestByTestId(test._id);
+          const userTestResult = apiUtils.parseResponse(userTestResponse);
+          
+          if (userTestResult.data && userTestResult.data.userTest) {
+            userTestsData[test._id] = userTestResult.data.userTest;
+          }
+        } catch (error) {
+          // User hasn't taken this test yet, which is normal
+          console.log(`No user test data for test ${test._id}`);
+        }
+      }
+      
+      setUserTests(userTestsData);
+    } catch (error) {
+      console.error("Error fetching user tests data:", error);
+    }
   }, []);
 
-  const onRefresh = () => {
-    fetchTests(true);
-  };
-
-  const renderTestItem = ({ item, index }) => (
-    <TouchableOpacity
-      style={[
-        styles.testItem,
-        {
-          backgroundColor: theme.colors.cardBackground,
-          borderColor: theme.colors.borderColor,
-        },
-      ]}
-      onPress={() =>
-        navigation.navigate("TestScreenDetail", {
-          testId: item._id,
-          testName: item.name || `Test ${index + 1}`,
-        })
-      }
-      activeOpacity={0.7}
-    >
-      <View style={styles.testItemContent}>
-        <View style={styles.testItemLeft}>
-          <Ionicons
-            name="document-text"
-            size={20}
-            color={theme.colors.primary}
-          />
-          <View style={styles.testInfo}>
-            <Text style={[styles.testName, { color: theme.colors.text }]}>
-              {item.name || `Test ${index + 1}`}
-            </Text>
-            <Text
-              style={[
-                styles.testDescription,
-                { color: theme.colors.textSecondary },
-              ]}
-            >
-              Final assessment for the course
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.testItemRight}>
-          {/* TODO: Add completion status badge when user test data is available */}
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={theme.colors.textMuted}
-          />
-        </View>
-      </View>
-    </TouchableOpacity>
+  useFocusEffect(
+    useCallback(() => {
+      fetchTests();
+    }, [fetchTests])
   );
+
+  const onRefresh = useCallback(() => {
+    fetchTests(true);
+  }, [fetchTests]);
+
+  const renderTestItem = ({ item, index }) => {
+    const userTest = userTests[item._id];
+    const hasUserTest = !!userTest;
+    const isPassed = userTest?.status === "passed";
+    const isFailed = userTest?.status === "failed";
+
+    return (
+      <View
+        style={[
+          styles.testItem,
+          {
+            backgroundColor: theme.colors.cardBackground,
+            borderColor: hasUserTest 
+              ? (isPassed ? "#10D876" : "#FF6B6B") 
+              : theme.colors.borderColor,
+            borderWidth: hasUserTest ? 2 : 1,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.testItemContent}
+          onPress={() =>
+            navigation.navigate("TestScreenDetail", {
+              testId: item._id,
+              testName: item.name || `Test ${index + 1}`,
+            })
+          }
+          activeOpacity={0.7}
+        >
+        <View style={styles.testItemContent}>
+          <View style={styles.testItemLeft}>
+            <Ionicons
+              name="document-text"
+              size={20}
+              color={theme.colors.primary}
+            />
+            <View style={styles.testInfo}>
+              <Text style={[styles.testName, { color: theme.colors.text }]}>
+                {item.name || `Test ${index + 1}`}
+              </Text>
+              <Text
+                style={[
+                  styles.testDescription,
+                  { color: theme.colors.textSecondary },
+                ]}
+              >
+                {hasUserTest 
+                  ? `Score: ${userTest.score}% - ${userTest.status?.charAt(0).toUpperCase() + userTest.status?.slice(1).toLowerCase()}`
+                  : "Final assessment for the course"
+                }
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.testItemRight}>
+            {hasUserTest && (
+              <View style={[
+                styles.statusBadge,
+                { 
+                  backgroundColor: isPassed ? "rgba(16, 216, 118, 0.1)" : "rgba(255, 107, 107, 0.1)",
+                  borderColor: isPassed ? "#10D876" : "#FF6B6B",
+                }
+              ]}>
+                <Ionicons
+                  name={isPassed ? "checkmark-circle" : "close-circle"}
+                  size={20}
+                  color={isPassed ? "#10D876" : "#FF6B6B"}
+                />
+              </View>
+            )}
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={theme.colors.textMuted}
+              style={{ marginLeft: 8 }}
+            />
+          </View>
+                  </View>
+        </TouchableOpacity>
+        
+        {/* Retry button for failed tests */}
+        {isFailed && (
+          <View style={styles.retrySection}>
+            <TouchableOpacity
+              style={[
+                styles.retryButton,
+                { backgroundColor: theme.colors.primary }
+              ]}
+              onPress={() =>
+                navigation.navigate("TestScreenDetail", {
+                  testId: item._id,
+                  testName: item.name || `Test ${index + 1}`,
+                  isRetry: true,
+                })
+              }
+            >
+              <Ionicons name="refresh" size={16} color="#fff" />
+              <Text style={styles.retryButtonText}>Retry Test</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const renderHeader = () => (
     <View
@@ -132,17 +215,15 @@ const TestScreen = ({ route }) => {
         >
           <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <View style={styles.titleContainer}>
-          <Text
-            style={[
-              globalStyles.title,
-              styles.headerTitle,
-              { color: theme.colors.text },
-            ]}
-          >
-            Course Tests
-          </Text>
-        </View>
+        <Text
+          style={[
+            globalStyles.title,
+            styles.headerTitle,
+            { color: theme.colors.text },
+          ]}
+        >
+          Course Tests
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -332,6 +413,35 @@ const styles = StyleSheet.create({
   },
   testItemRight: {
     marginLeft: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statusBadge: {
+    padding: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 4,
+  },
+  retrySection: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 107, 107, 0.2)",
+  },
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 6,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Mulish-SemiBold",
   },
   emptyContainer: {
     flex: 1,
