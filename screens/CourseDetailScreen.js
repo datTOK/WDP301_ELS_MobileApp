@@ -3,23 +3,18 @@ import {
   View,
   Text,
   ScrollView,
-  ActivityIndicator,
   StyleSheet,
   Image,
   TextInput,
   TouchableOpacity,
-  Alert,
   Platform,
   Modal,
 } from "react-native";
-import { Card, Button, Icon, Overlay, Chip } from "react-native-elements";
+import { Card, Icon, Overlay, Chip } from "react-native-elements";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import LoadingSpinner from "../components/LoadingSpinner";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import prettyFormat from "pretty-format";
-import axios from "axios";
 import {
   lessonService,
   userLessonService,
@@ -114,10 +109,8 @@ const ExerciseItem = ({
           response.userExercise?.exercise?.explanation || ""
         );
 
-        //this does nothing?
-        // if (onSubmission) {
-        //   onSubmission(exercise._id, result.data.isCorrect);
-        // }
+        // Show success toast
+        showSuccess("Correct!", "Great job! Your answer is correct.");
 
         if (onExerciseCompleted) {
           onExerciseCompleted(exercise._id, true);
@@ -132,11 +125,19 @@ const ExerciseItem = ({
         setFeedbackMessage("Incorrect");
         // Try to get explanation from result, fallback to exercise.explanation
         setFeedbackExplanation(
-          result.data.userExercise?.exercise?.explanation ||
-            result.data.explanation ||
+          response.userExercise?.exercise?.explanation ||
+            response.explanation ||
             exercise.explanation ||
             ""
         );
+
+        // Show error toast
+        showError("Incorrect", "That's not quite right. Try again!");
+        
+        // Still mark as completed but incorrect
+        if (onExerciseCompleted) {
+          onExerciseCompleted(exercise._id, false);
+        }
       }
     } catch (error) {
       const errorInfo = apiUtils.handleError(error);
@@ -160,6 +161,9 @@ const ExerciseItem = ({
     if (onExerciseCompleted) {
       onExerciseCompleted(exercise._id, false); // Reset completion status
     }
+    
+    // Show info toast
+    showWarning("Reset", "Exercise has been reset. Try again!");
   };
 
   const toggleAnswer = () => {
@@ -168,17 +172,31 @@ const ExerciseItem = ({
 
   return (
     <View style={exerciseItemStyles.container}>
-      {isLessonCompleted && (
+      {(isLessonCompleted || isSubmitted) && (
         <View style={exerciseItemStyles.completedIndicator}>
           <Ionicons name="checkmark-circle" size={20} color="#28a745" />
           <Text style={exerciseItemStyles.completedIndicatorText}>
-            Lesson Completed - Review Mode
+            {isLessonCompleted ? "Lesson Completed - Review Mode" : "Exercise Completed"}
           </Text>
         </View>
       )}
       <View style={exerciseItemStyles.questionContainer}>
         <Text style={exerciseItemStyles.questionText}>{exercise.question}</Text>
       </View>
+
+      {/* Display exercise image if available */}
+      {exercise.image && (
+        <View style={exerciseItemStyles.imageContainer}>
+          <Image 
+            source={{ uri: exercise.image }} 
+            style={exerciseItemStyles.exerciseImage}
+            resizeMode="contain"
+            onError={(error) => console.log('Exercise image loading error:', error)}
+            onLoad={() => console.log('Exercise image loaded successfully')}
+            defaultSource={require("../assets/placeholder-image.jpg")}
+          />
+        </View>
+      )}
 
       {exercise.options && exercise.options.length > 0 ? (
         <View style={exerciseItemStyles.optionsContainer}>
@@ -271,39 +289,63 @@ const ExerciseItem = ({
       <View style={exerciseItemStyles.actionButtons}>
         {!isSubmitted ? (
           <>
-            <Button
-              title={isSubmitting ? "Submitting..." : "Submit Answer"}
-              buttonStyle={exerciseItemStyles.submitButton}
-              titleStyle={exerciseItemStyles.submitButtonText}
+            <TouchableOpacity
+              style={[
+                exerciseItemStyles.submitButton,
+                (isSubmitting || (!userAnswer.trim() && !selectedOption) || isLessonCompleted) && 
+                exerciseItemStyles.submitButtonDisabled
+              ]}
               onPress={checkAnswer}
               disabled={
                 isSubmitting ||
                 (!userAnswer.trim() && !selectedOption) ||
                 isLessonCompleted
               }
-            />
-            <Button
-              title="See Answer"
-              buttonStyle={exerciseItemStyles.seeAnswerButton}
-              titleStyle={exerciseItemStyles.seeAnswerButtonText}
+              activeOpacity={0.7}
+            >
+              <Text style={exerciseItemStyles.submitButtonText}>
+                {isSubmitting ? "Submitting..." : "Submit Answer"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={exerciseItemStyles.seeAnswerButton}
               onPress={toggleAnswer}
-            />
+              activeOpacity={0.7}
+            >
+              <Text style={exerciseItemStyles.seeAnswerButtonText}>
+                See Answer
+              </Text>
+            </TouchableOpacity>
           </>
         ) : (
           <View style={exerciseItemStyles.postSubmissionButtons}>
-            <Button
-              title="Try Again"
-              buttonStyle={exerciseItemStyles.tryAgainButton}
-              titleStyle={exerciseItemStyles.tryAgainButtonText}
-              onPress={resetExercise}
-              disabled={isLessonCompleted}
-            />
-            <Button
-              title="See Answer"
-              buttonStyle={exerciseItemStyles.seeAnswerButton}
-              titleStyle={exerciseItemStyles.seeAnswerButtonText}
-              onPress={toggleAnswer}
-            />
+            {!isCorrect ? (
+              // Only show Try Again button for incorrect answers
+              <TouchableOpacity
+                style={[
+                  exerciseItemStyles.tryAgainButton,
+                  isLessonCompleted && exerciseItemStyles.tryAgainButtonDisabled
+                ]}
+                onPress={resetExercise}
+                disabled={isLessonCompleted}
+                activeOpacity={0.7}
+              >
+                <Text style={exerciseItemStyles.tryAgainButtonText}>
+                  Try Again
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              // Show only See Answer button for correct answers
+              <TouchableOpacity
+                style={exerciseItemStyles.seeAnswerButton}
+                onPress={toggleAnswer}
+                activeOpacity={0.7}
+              >
+                <Text style={exerciseItemStyles.seeAnswerButtonText}>
+                  See Answer
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -641,42 +683,99 @@ const CourseDetailScreen = ({ route, navigation }) => {
     <>
       {items.length > 0 ? (
         <>
-          {items.map((item, idx) => (
-            <TouchableOpacity
-              key={item.id || idx}
-              style={[styles.itemButtonLight]}
-              onPress={() => openModal(type, idx)}
-            >
-              <View style={styles.itemContent}>
-                <View style={styles.itemLeft}>
-                  <View style={[styles.itemIcon]}>
-                    <Ionicons name={"play"} size={16} color={"#2563EB"} />
+          {items.map((item, idx) => {
+            const isCompleted = type === "exercise" && completedExercises[item._id];
+            const isLessonCompleted = userLesson?.status === "completed";
+            
+            return (
+              <TouchableOpacity
+                key={item.id || idx}
+                style={[
+                  styles.itemButtonLight,
+                  isCompleted && styles.completedItem,
+                  isLessonCompleted && type === "exercise" && styles.completedItem
+                ]}
+                onPress={() => openModal(type, idx)}
+              >
+                <View style={styles.itemContent}>
+                  <View style={styles.itemLeft}>
+                    <View style={[
+                      styles.itemIcon,
+                      isCompleted && styles.completedIcon,
+                      isLessonCompleted && type === "exercise" && styles.completedIcon
+                    ]}>
+                      <Ionicons 
+                        name={
+                          type === "grammar" 
+                            ? "book-outline" 
+                            : type === "vocab" 
+                            ? "library-outline" 
+                            : isCompleted || (isLessonCompleted && type === "exercise")
+                            ? "checkmark-circle"
+                            : "pencil-outline"
+                        } 
+                        size={16} 
+                        color={
+                          isCompleted || (isLessonCompleted && type === "exercise")
+                            ? "#28a745"
+                            : "#2563EB"
+                        } 
+                      />
+                    </View>
+                    <View>
+                      <Text style={[styles.itemTitleLight]}>
+                        {type === "grammar"
+                          ? item.title
+                          : type === "vocab"
+                          ? item.englishContent
+                          : `Practice ${idx + 1}`}
+                      </Text>
+                      <Text style={[
+                        styles.itemStatus,
+                        isCompleted && styles.completedStatusText,
+                        isLessonCompleted && type === "exercise" && styles.completedStatusText
+                      ]}>
+                        {type === "exercise" 
+                          ? (isCompleted || isLessonCompleted 
+                              ? "Completed" 
+                              : "Ready to start")
+                          : "Ready to start"
+                        }
+                      </Text>
+                      {/* Show image for vocabulary items */}
+                      {type === "vocab" && item.imageUrl && (
+                        <View style={styles.itemImageContainer}>
+                          <Image 
+                            source={{ uri: item.imageUrl }} 
+                            style={styles.itemImage}
+                            resizeMode="cover"
+                            onError={(error) => console.log('Vocabulary list image loading error:', error)}
+                            onLoad={() => console.log('Vocabulary list image loaded successfully')}
+                          />
+                        </View>
+                      )}
+                    </View>
                   </View>
-                  <View>
-                    <Text style={[styles.itemTitleLight]}>
-                      {type === "grammar"
-                        ? item.title
-                        : type === "vocab"
-                        ? item.englishContent
-                        : `Practice ${idx + 1}`}
-                    </Text>
-                    <Text style={[styles.itemStatus]}>{"Ready to start"}</Text>
-                  </View>
+                  {(isCompleted || (isLessonCompleted && type === "exercise")) && (
+                    <View style={styles.completionBadge}>
+                      <Ionicons name="checkmark" size={12} color="#28a745" />
+                    </View>
+                  )}
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </>
       ) : (
-        <Text>No content available</Text>
+        <Text style={{ color: "#ccc", fontFamily: "Mulish-Regular" }}>No content available</Text>
       )}
     </>
   );
   const renderTabs = (activeTab, setActiveTab, tabData = []) => {
     const tabs = [
-      { key: "grammar", label: "Grammar", icon: "📝" },
-      { key: "vocabulary", label: "Vocabulary", icon: "📚" },
-      { key: "practice", label: "Practice", icon: "🎯" },
+      { key: "grammar", label: "Grammar", icon: "book-outline" },
+      { key: "vocabulary", label: "Vocabulary", icon: "library-outline" },
+      { key: "practice", label: "Practice", icon: "pencil-outline" },
     ];
 
     return (
@@ -699,7 +798,12 @@ const CourseDetailScreen = ({ route, navigation }) => {
               activeOpacity={0.7}
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text style={{ fontSize: 16, marginRight: 6 }}>{tab.icon}</Text>
+                <Ionicons 
+                  name={tab.icon} 
+                  size={16} 
+                  color={isActive ? "#fff" : "#b0b8c1"} 
+                  style={{ marginRight: 6 }}
+                />
                 <Text
                   style={[
                     enhancedTabStyles.tabText,
@@ -727,7 +831,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
   // Render modal content for the selected item
   const renderModalContent = () => {
     if (!modalType || !lesson) {
-      return <Text style={{ color: "#fff" }}>No content available</Text>;
+      return <Text style={{ color: "#fff", fontFamily: "Mulish-Regular" }}>No content available</Text>;
     }
     let items = [];
 
@@ -735,7 +839,7 @@ const CourseDetailScreen = ({ route, navigation }) => {
     if (modalType === "vocab") items = lesson.vocabularies;
     if (modalType === "exercise") items = lesson.exercises;
     if (!items[modalIndex]) {
-      return <Text style={{ color: "#fff" }}>No content available</Text>;
+      return <Text style={{ color: "#fff", fontFamily: "Mulish-Regular" }}>No content available</Text>;
     }
 
     const item = items[modalIndex];
@@ -798,7 +902,14 @@ const CourseDetailScreen = ({ route, navigation }) => {
                 Vietnamese: {item.vietnameseContent}
               </Text>
               {item.imageUrl && (
-                <Image source={{ uri: item.imageUrl }} style={styles.image} />
+                <>
+                  <Image 
+                    source={{ uri: item.imageUrl }} 
+                    style={styles.image}
+                    onError={(error) => console.log('Vocabulary image loading error:', error)}
+                    onLoad={() => console.log('Vocabulary image loaded successfully')}
+                  />
+                </>
               )}
             </View>
           )}
@@ -812,11 +923,15 @@ const CourseDetailScreen = ({ route, navigation }) => {
               />
             </View>
           )}
-          <Button
-            title="Close"
+          <TouchableOpacity
+            style={styles.closeModalButton}
             onPress={closeModal}
-            buttonStyle={styles.closeModalButton}
-          />
+            activeOpacity={0.7}
+          >
+            <Text style={styles.closeModalButtonText}>
+              Close
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     );
@@ -876,27 +991,39 @@ const CourseDetailScreen = ({ route, navigation }) => {
             </View>
           </View>
         )}
+
+        {/* Complete Button */}
+        <TouchableOpacity
+          onPress={() => markLessonCompleted(lessonId)}
+          disabled={
+            userLesson?.status === "completed" || !isLessonFullyCompleted()
+          }
+        >
+          <View
+            style={[
+              styles.completeButton,
+              userLesson?.status === "completed" || !isLessonFullyCompleted()
+                ? styles.completeButtonDisabled
+                : null,
+            ]}
+          >
+            <Text
+              style={[
+                styles.completeButtonText,
+                userLesson?.status === "completed" || !isLessonFullyCompleted()
+                  ? styles.completeButtonTextDisabled
+                  : null,
+              ]}
+            >
+              {userLesson?.status === "completed"
+                ? "Lesson Completed"
+                : isLessonFullyCompleted()
+                ? "Mark as Completed"
+                : "Complete All Exercises"}
+            </Text>
+          </View>
+        </TouchableOpacity>
       </Card>
-      <Button
-        title={
-          userLesson?.status === "completed"
-            ? "Lesson Completed"
-            : isLessonFullyCompleted()
-            ? "Mark as Completed"
-            : "Complete All Exercises"
-        }
-        buttonStyle={
-          userLesson?.status === "completed"
-            ? styles.completedButton
-            : isLessonFullyCompleted()
-            ? styles.completeButton
-            : styles.incompleteButton
-        }
-        onPress={() => markLessonCompleted(lessonId)}
-        disabled={
-          userLesson?.status === "completed" || !isLessonFullyCompleted()
-        }
-      />
       {Platform.OS === "web" ? (
         <Overlay
           isVisible={modalVisible}
@@ -933,12 +1060,15 @@ const CourseDetailScreen = ({ route, navigation }) => {
       <View style={styles.errorContainer}>
         <Ionicons name="alert-circle-outline" size={50} color="#ff6b6b" />
         <Text style={styles.errorText}>{error}</Text>
-        <Button
-          title="Retry"
+        <TouchableOpacity
+          style={styles.retryButton}
           onPress={fetchLessonDetails}
-          buttonStyle={styles.retryButton}
-          titleStyle={styles.retryButtonText}
-        />
+          activeOpacity={0.7}
+        >
+          <Text style={styles.retryButtonText}>
+            Retry
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -967,23 +1097,17 @@ const styles = StyleSheet.create({
   // Main app container (light background)
   containerLight: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#202020",
   },
   // Card or section with dark background
   cardDark: {
     borderRadius: 20,
     margin: 12,
     padding: 18,
-    backgroundColor: "#23272f",
-    borderColor: "#23272f",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 8,
+    backgroundColor: "#232323",
+    borderColor: "#232323",
     maxWidth: "100%",
-    height: "80%",
-    overflowY: "scroll",
+    minHeight: 400,
   },
   // Header (dark)
   headerDark: {
@@ -992,13 +1116,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 15,
     paddingVertical: 10,
-    backgroundColor: "#181818",
+    backgroundColor: "#202020",
     borderBottomWidth: 1,
     borderBottomColor: "#333",
   },
   // Header (light)
   headerLight: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#2b2b2b",
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: "row",
@@ -1010,30 +1134,30 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: "#333",
   },
-  backButton: {
+  backButton: { 
     padding: 8,
     marginLeft: -8,
   },
   headerTitleDark: {
     fontSize: 20,
-    fontWeight: "bold",
     color: "#fff",
     flex: 1,
     textAlign: "center",
+    fontFamily: "Mulish-Bold",
   },
   headerTitleLight: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
+    color: "#fff",
+    fontFamily: "Mulish-SemiBold",
   },
   headerSpacer: {
     width: 40,
   },
   lessonContentContainer: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#202020",
     width: "100%",
   },
   lessonContentScrollContainer: {
@@ -1045,6 +1169,7 @@ const styles = StyleSheet.create({
     color: "#ccc",
     textAlign: "center",
     lineHeight: 20,
+    fontFamily: "Mulish-Regular",
   },
   section: {
     marginTop: 15,
@@ -1056,9 +1181,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "bold",
     color: "#007AFF",
     marginLeft: 10,
+    fontFamily: "Mulish-Bold",
   },
   item: {
     marginBottom: 15,
@@ -1068,19 +1193,20 @@ const styles = StyleSheet.create({
   },
   itemTitleDark: {
     fontSize: 16,
-    fontWeight: "bold",
     color: "#fff",
+    fontFamily: "Mulish-Bold",
   },
   itemTitleLight: {
     fontSize: 17,
-    fontWeight: "700",
-    color: "#23272f",
+    color: "#fff",
     marginBottom: 2,
+    fontFamily: "Mulish-Bold",
   },
   itemText: {
     fontSize: 14,
     color: "#ccc",
     marginTop: 5,
+    fontFamily: "Mulish-Regular",
   },
   image: {
     width: "100%",
@@ -1092,17 +1218,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#202020",
   },
   loadingText: {
     color: "#007AFF",
     marginTop: 10,
+    fontFamily: "Mulish-Regular",
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#202020",
     padding: 20,
   },
   errorText: {
@@ -1110,17 +1237,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     textAlign: "center",
+    fontFamily: "Mulish-Regular",
   },
   retryButton: {
     backgroundColor: "#007bff",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   testSection: {
     marginTop: 20,
@@ -1128,14 +1258,14 @@ const styles = StyleSheet.create({
   },
   testSectionTitle: {
     fontSize: 20,
-    fontWeight: "bold",
     marginBottom: 10,
-    color: "#333",
+    color: "#fff",
+    fontFamily: "Mulish-Bold",
   },
   testCard: {
     borderRadius: 10,
     marginBottom: 10,
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#2b2b2b",
     borderColor: "#333",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
@@ -1145,19 +1275,21 @@ const styles = StyleSheet.create({
   },
   testTitle: {
     fontSize: 18,
-    fontWeight: "bold",
     marginBottom: 5,
     color: "#fff",
+    fontFamily: "Mulish-Bold",
   },
   testDescription: {
     fontSize: 14,
     color: "#ccc",
     marginBottom: 10,
+    fontFamily: "Mulish-Regular",
   },
   testInfo: {
     fontSize: 16,
     marginBottom: 10,
     color: "#ccc",
+    fontFamily: "Mulish-Regular",
   },
   testButton: {
     backgroundColor: "#28a745",
@@ -1166,7 +1298,7 @@ const styles = StyleSheet.create({
   testButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   textInput: {
     backgroundColor: "#444",
@@ -1174,6 +1306,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginTop: 10,
+    fontFamily: "Mulish-Regular",
   },
   optionButton: {
     backgroundColor: "#555",
@@ -1196,14 +1329,15 @@ const styles = StyleSheet.create({
   },
   optionText: {
     color: "#fff",
+    fontFamily: "Mulish-Regular",
   },
   selectedOptionText: {
     color: "#fff",
-    fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   correctOptionText: {
     color: "#fff",
-    fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   actionButtons: {
     flexDirection: "row",
@@ -1220,21 +1354,21 @@ const styles = StyleSheet.create({
   checkButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   itemButtonLight: {
-    backgroundColor: "#fff",
+    backgroundColor: "#232323",
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: 16,
     marginBottom: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#333",
   },
   itemButtonDark: {
     padding: 12,
@@ -1244,8 +1378,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#2a2a2a",
   },
   completedItem: {
-    backgroundColor: "#F0FDF4",
-    borderColor: "#BBF7D0",
+    backgroundColor: "#1a1a1a",
+    borderColor: "#28a745",
+    borderWidth: 1,
   },
   lockedItem: {
     backgroundColor: "#F3F4F6",
@@ -1277,20 +1412,27 @@ const styles = StyleSheet.create({
   },
   completedIcon: {
     backgroundColor: "#DCFCE7",
+    shadowColor: "#28a745",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 1,
   },
   lockedIcon: {
     backgroundColor: "#E5E7EB",
   },
   itemStatus: {
     fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+    color: "#AAA",
+    fontFamily: "Mulish-Medium",
   },
   lockedText: {
     color: "#9CA3AF",
+    fontFamily: "Mulish-Regular",
   },
   lockedStatusText: {
     color: "#D1D5DB",
+    fontFamily: "Mulish-Regular",
   },
   chipSection: {
     marginTop: 15,
@@ -1299,10 +1441,10 @@ const styles = StyleSheet.create({
   },
   chipSectionTitle: {
     fontSize: 16,
-    fontWeight: "bold",
     color: "#bbb",
     marginBottom: 8,
     textAlign: "center",
+    fontFamily: "Mulish-Bold",
   },
   chipRow: {
     flexDirection: "row",
@@ -1317,7 +1459,7 @@ const styles = StyleSheet.create({
   },
   chipTitle: {
     color: "#fff",
-    fontWeight: "bold",
+    fontFamily: "Mulish-Bold",
   },
   modalOverlay: {
     width: "90%",
@@ -1352,11 +1494,11 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "bold",
     color: "#fff",
     flex: 1,
     textAlign: "center",
     paddingHorizontal: 10,
+    fontFamily: "Mulish-Bold",
   },
   modalBody: {
     marginBottom: 15,
@@ -1367,10 +1509,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     borderRadius: 8,
     marginTop: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeModalButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Mulish-Bold",
   },
   progressContainer: {
     marginTop: 15,
-    marginBottom: 10,
+    marginBottom: 20,
     width: "100%",
     paddingHorizontal: 10,
   },
@@ -1379,6 +1530,7 @@ const styles = StyleSheet.create({
     color: "#ccc",
     marginBottom: 5,
     textAlign: "center",
+    fontFamily: "Mulish-Regular",
   },
   progressBar: {
     height: 8,
@@ -1403,8 +1555,8 @@ const styles = StyleSheet.create({
   lessonCompletedText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
     marginLeft: 8,
+    fontFamily: "Mulish-Bold",
   },
   nativeModalOverlay: {
     flex: 1,
@@ -1426,23 +1578,82 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
     borderWidth: 1,
     borderColor: "#4CAF50",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   completeButton: {
     marginVertical: 10,
     marginHorizontal: 15,
     borderRadius: 10,
-    backgroundColor: "#2196F3",
+    backgroundColor: "#10D876",
     borderWidth: 1,
-    borderColor: "#2196F3",
+    borderColor: "#10D876",
+    shadowColor: "#10D876",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  completeButtonDisabled: {
+    backgroundColor: "#444",
+    borderColor: "#555",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  completeButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "Mulish-SemiBold",
+  },
+  completeButtonTextDisabled: {
+    color: "#D1D5DB",
+    fontFamily: "Mulish-Regular",
   },
   incompleteButton: {
     marginVertical: 10,
     marginHorizontal: 15,
     borderRadius: 10,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#444",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#555",
     opacity: 0.6,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  incompleteButtonText: {
+    color: "#D1D5DB",
+    fontFamily: "Mulish-Regular",
+  },
+  completionBadge: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    backgroundColor: "#DCFCE7",
+    borderRadius: 10,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: "#28a745",
+  },
+  completedStatusText: {
+    color: "#28a745",
+  },
+  itemImageContainer: {
+    marginTop: 8,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  itemImage: {
+    width: 60,
+    height: 40,
+    borderRadius: 6,
   },
 });
 
@@ -1450,30 +1661,30 @@ const styles = StyleSheet.create({
 const enhancedTabStyles = {
   // Main container for the entire tab section
   tabSection: {
-    backgroundColor: "#2a2a2a",
+    backgroundColor: "#2b2b2b",
     borderRadius: 16,
     margin: 12,
     padding: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
 
   // Tab Container - more refined
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: "#181c22",
+    backgroundColor: "#202020",
     borderRadius: 14,
     padding: 4,
     marginBottom: 18,
     marginHorizontal: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
 
   // Individual Tab Button - improved proportions
@@ -1487,14 +1698,19 @@ const enhancedTabStyles = {
     minHeight: 48,
   },
 
+  // Tab with badge (for future use)
+  tabWithBadge: {
+    position: "relative",
+  },
+
   // Active Tab - more prominent
   activeTab: {
     backgroundColor: "#007AFF",
     shadowColor: "#007AFF",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
 
   // Inactive Tab
@@ -1518,7 +1734,6 @@ const enhancedTabStyles = {
   // Tab Text - better typography
   tabText: {
     fontSize: 15,
-    fontWeight: "600",
     color: "#b0b8c1",
     textAlign: "center",
     fontFamily: "Mulish-SemiBold",
@@ -1527,7 +1742,6 @@ const enhancedTabStyles = {
   // Active Tab Text
   activeTabText: {
     color: "#fff",
-    fontWeight: "700",
     fontFamily: "Mulish-Bold",
   },
 
@@ -1543,18 +1757,17 @@ const enhancedTabStyles = {
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#23272f",
+    borderColor: "#232323",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
 
   tabBadgeText: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
   },
 
@@ -1565,17 +1778,17 @@ const enhancedTabStyles = {
 
   // Enhanced item styling
   itemButton: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#232323",
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
     borderWidth: 1,
-    borderColor: "#F3F4F6",
+    borderColor: "#333",
   },
 
   // Item content layout
@@ -1602,8 +1815,8 @@ const enhancedTabStyles = {
     marginRight: 12,
     shadowColor: "#2563EB",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 1,
     elevation: 1,
   },
 
@@ -1616,8 +1829,7 @@ const enhancedTabStyles = {
   // Item title
   itemTitle: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
+    color: "#fff",
     marginBottom: 2,
     fontFamily: "Mulish-SemiBold",
   },
@@ -1625,8 +1837,7 @@ const enhancedTabStyles = {
   // Item subtitle
   itemSubtitle: {
     fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+    color: "#ccc",
     fontFamily: "Mulish-Medium",
   },
 
@@ -1637,16 +1848,15 @@ const enhancedTabStyles = {
     paddingHorizontal: 16,
     paddingVertical: 8,
     shadowColor: "#007AFF",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 1,
   },
 
   startButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "600",
     fontFamily: "Mulish-SemiBold",
   },
 
@@ -1666,9 +1876,8 @@ const enhancedTabStyles = {
 
   emptyStateText: {
     fontSize: 16,
-    color: "#6B7280",
+    color: "#ccc",
     textAlign: "center",
-    fontWeight: "500",
     fontFamily: "Mulish-Medium",
   },
 
@@ -1685,13 +1894,12 @@ const enhancedTabStyles = {
     color: "#9CA3AF",
     textAlign: "center",
     marginBottom: 8,
-    fontWeight: "500",
     fontFamily: "Mulish-Medium",
   },
 
   progressBar: {
     height: 6,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: "#202020",
     borderRadius: 3,
     overflow: "hidden",
   },
@@ -1702,8 +1910,8 @@ const enhancedTabStyles = {
     borderRadius: 3,
     shadowColor: "#007AFF",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
   },
 
   // Complete button
@@ -1716,16 +1924,15 @@ const enhancedTabStyles = {
     marginHorizontal: 12,
     alignItems: "center",
     shadowColor: "#10D876",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
 
   completeButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "600",
     fontFamily: "Mulish-SemiBold",
   },
 
@@ -1736,6 +1943,7 @@ const enhancedTabStyles = {
 
   completeButtonTextDisabled: {
     color: "#D1D5DB",
+    fontFamily: "Mulish-Regular",
   },
 };
 
@@ -1743,8 +1951,10 @@ const exerciseItemStyles = StyleSheet.create({
   container: {
     marginBottom: 15,
     padding: 10,
-    backgroundColor: "#333",
+    backgroundColor: "#2b2b2b",
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#333",
   },
   completedIndicator: {
     flexDirection: "row",
@@ -1757,7 +1967,6 @@ const exerciseItemStyles = StyleSheet.create({
   completedIndicatorText: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "bold",
     marginLeft: 5,
     fontFamily: "Mulish-Bold",
   },
@@ -1766,7 +1975,6 @@ const exerciseItemStyles = StyleSheet.create({
   },
   questionText: {
     fontSize: 16,
-    fontWeight: "bold",
     color: "#fff",
     fontFamily: "Mulish-Bold",
   },
@@ -1774,13 +1982,16 @@ const exerciseItemStyles = StyleSheet.create({
     marginTop: 5,
   },
   optionButton: {
-    backgroundColor: "#555",
+    backgroundColor: "#444",
     padding: 10,
     borderRadius: 5,
     marginTop: 5,
+    borderWidth: 1,
+    borderColor: "#555",
   },
   selectedOption: {
     backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
   },
   correctOption: {
     backgroundColor: "#28a745",
@@ -1798,12 +2009,10 @@ const exerciseItemStyles = StyleSheet.create({
   },
   selectedOptionText: {
     color: "#fff",
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
   },
   correctOptionText: {
     color: "#fff",
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
   },
   textInputContainer: {
@@ -1816,6 +2025,8 @@ const exerciseItemStyles = StyleSheet.create({
     borderRadius: 5,
     fontSize: 14,
     fontFamily: "Mulish-Regular",
+    borderWidth: 1,
+    borderColor: "#555",
   },
   correctInput: {
     borderColor: "#28a745",
@@ -1855,7 +2066,7 @@ const exerciseItemStyles = StyleSheet.create({
   },
   tabNavigation: {
     flexDirection: "row",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#202020",
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
@@ -1867,7 +2078,7 @@ const exerciseItemStyles = StyleSheet.create({
     borderRadius: 8,
   },
   activeTab: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#232323",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -1882,12 +2093,11 @@ const exerciseItemStyles = StyleSheet.create({
   },
   tabText: {
     fontSize: 12,
-    fontWeight: "500",
-    color: "#6B7280",
+    color: "#ccc",
     fontFamily: "Mulish-Medium",
   },
   activeTabText: {
-    color: "#111827",
+    color: "#fff",
     fontFamily: "Mulish-Medium",
   },
   scrollView: {
@@ -1906,56 +2116,90 @@ const exerciseItemStyles = StyleSheet.create({
     backgroundColor: "#007bff",
     borderRadius: 8,
     flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
   },
   submitButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
+    textAlign: "center",
   },
   postSubmissionButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 10,
+    gap: 10,
+    minHeight: 48,
   },
   tryAgainButton: {
-    backgroundColor: "#6c757d",
+    backgroundColor: "#dc3545",
     borderRadius: 8,
     flex: 1,
-    marginRight: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
   },
   tryAgainButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
+    textAlign: "center",
   },
   seeAnswerButton: {
-    backgroundColor: "#6c757d",
+    backgroundColor: "#28a745",
     borderRadius: 8,
     flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
   },
   seeAnswerButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
+    textAlign: "center",
   },
   answerContainer: {
     marginTop: 10,
     padding: 10,
     backgroundColor: "#444",
     borderRadius: 5,
+    borderWidth: 1,
+    borderColor: "#555",
   },
   answerText: {
     color: "#28a745",
-    fontWeight: "bold",
     fontFamily: "Mulish-Bold",
   },
   explanationText: {
     color: "#ccc",
     marginTop: 5,
     fontFamily: "Mulish-Regular",
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#6B7280",
+    opacity: 0.7,
+  },
+  tryAgainButtonDisabled: {
+    backgroundColor: "#6B7280",
+    opacity: 0.7,
+  },
+  imageContainer: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  exerciseImage: {
+    width: "100%",
+    height: 150,
+    borderRadius: 5,
   },
 });
 

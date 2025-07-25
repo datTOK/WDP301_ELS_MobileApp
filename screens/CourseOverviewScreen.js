@@ -557,7 +557,6 @@ const styles = StyleSheet.create({
   difficultyText: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "600",
     fontFamily: "Mulish-SemiBold",
     marginLeft: 4,
   },
@@ -613,7 +612,6 @@ const styles = StyleSheet.create({
     color: "#AAA",
     fontFamily: "Mulish-Medium",
     marginLeft: 6,
-    fontWeight: "500",
   },
 
   // Progress Card
@@ -777,7 +775,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
     fontFamily: "Mulish-SemiBold",
   },
   disabledButtonText: {
@@ -820,7 +817,6 @@ const styles = StyleSheet.create({
   detailValue: {
     fontSize: 14,
     color: "#fff",
-    fontWeight: "500",
     fontFamily: "Mulish-Medium",
   },
 
@@ -860,7 +856,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
     fontFamily: "Mulish-SemiBold",
   },
   backButton: {

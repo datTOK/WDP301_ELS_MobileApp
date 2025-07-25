@@ -60,13 +60,13 @@ export default function LoginScreen({ navigation }) {
       showError("Please fill in all fields");
       return;
     }
-
+    
     setIsLoading(true);
     try {
       const response = await authService.login({ email, password });
-
+      console.log("response", response)
       const result = apiUtils.parseResponse(response);
-
+      console.log("result", result)
       if (result.data?.accessToken) {
         try {
           await signIn(result.data.accessToken);
@@ -82,6 +82,7 @@ export default function LoginScreen({ navigation }) {
         showError("Invalid response from server");
       }
     } catch (error) {
+      console.log(error)
       const errorInfo = apiUtils.handleError(error);
       showError(errorInfo.message);
     } finally {

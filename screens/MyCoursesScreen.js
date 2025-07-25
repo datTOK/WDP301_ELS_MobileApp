@@ -15,7 +15,7 @@ import { Card } from 'react-native-elements';
 import { useToast } from '../context/ToastContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { userCourseService, courseService, apiUtils } from '../services';
+import { userCourseService, courseService, lessonService, userLessonService, apiUtils } from '../services';
 
 const { width } = Dimensions.get("window");
 
@@ -170,50 +170,86 @@ const MyCoursesScreen = ({ navigation }) => {
         return;
       }
 
-              // Fetch detailed course information for each enrolled course
-        const courseDetailsPromises = response.data.map(async (userCourse) => {
-          try {
-            const courseResponse = await courseService.getCourseById(userCourse.courseId);
-            
-            if (courseResponse && courseResponse.course) {
-              const courseData = courseResponse.course;
-              return {
-                ...courseData,
-                userCourse,
-                enrolledAt: userCourse.createdAt,
-              };
-            }
-            return null;
-          } catch (courseError) {
-            console.error('Error fetching course details:', userCourse.courseId, courseError);
-            // Return a placeholder course object for deleted courses
+      // Fetch detailed course information for each enrolled course
+      const courseDetailsPromises = response.data.map(async (userCourse) => {
+        try {
+          const courseResponse = await courseService.getCourseById(userCourse.courseId);
+          
+          if (courseResponse && courseResponse.course) {
+            const courseData = courseResponse.course;
             return {
-              _id: userCourse.courseId,
-              name: 'Course Unavailable',
-              description: 'This course is no longer available.',
-              coverImage: null,
-              level: 'Unknown',
-              createdAt: userCourse.createdAt,
+              ...courseData,
               userCourse,
               enrolledAt: userCourse.createdAt,
-              isDeleted: true,
             };
           }
-        });
+          return null;
+        } catch (courseError) {
+          console.error('Error fetching course details:', userCourse.courseId, courseError);
+          // Return a placeholder course object for deleted courses
+          return {
+            _id: userCourse.courseId,
+            name: 'Course Unavailable',
+            description: 'This course is no longer available.',
+            coverImage: null,
+            level: 'Unknown',
+            createdAt: userCourse.createdAt,
+            userCourse,
+            enrolledAt: userCourse.createdAt,
+            isDeleted: true,
+          };
+        }
+      });
 
       const courseDetails = await Promise.all(courseDetailsPromises);
       const validCourses = courseDetails.filter(course => course !== null);
 
       setCourses(validCourses);
 
-      // Calculate progress for each course
+      // Calculate progress for each course by counting completed lessons
       const progressData = {};
-      validCourses.forEach(course => {
-        if (course.userCourse) {
-          // Use actual progress data if available
-          progressData[course._id] = Math.round(course.userCourse.averageScore || 0);
+      await Promise.all(validCourses.map(async (course) => {
+        if (course.isDeleted) {
+          progressData[course._id] = 0;
+          return;
         }
-      });
+
+        try {
+          // Get all lessons for this course
+          const lessonsResponse = await lessonService.getLessonsByCourseId(course._id, {
+            page: 1,
+            size: 9999
+          });
+          
+          const lessons = lessonsResponse.data || [];
+          const totalLessons = lessons.length;
+          
+          if (totalLessons === 0) {
+            progressData[course._id] = 0;
+            return;
+          }
+
+          // Get user lessons for this specific course using the optimized method
+          const userLessons = await userLessonService.getUserLessonsByCourseId(user._id, course._id);
+          
+          // Count completed lessons for this specific course
+          const completedLessons = userLessons.filter(userLesson => 
+            userLesson.status === 'completed'
+          ).length;
+
+          // Calculate progress percentage
+          const progressPercentage = Math.round((completedLessons / totalLessons) * 100);
+          progressData[course._id] = progressPercentage;
+          
+          console.log(`Course ${course.name}: ${completedLessons}/${totalLessons} lessons completed (${progressPercentage}%)`);
+          
+        } catch (error) {
+          console.error('Error calculating progress for course:', course._id, error);
+          // Fallback to averageScore if available, otherwise 0
+          progressData[course._id] = Math.round(course.userCourse?.averageScore || 0);
+        }
+      }));
+
       setCourseProgress(progressData);
 
     } catch (err) {
@@ -407,14 +443,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
     color: '#fff',
     fontFamily: "Mulish-Bold",
   },
   headerSubtitle: {
     fontSize: 15,
     color: '#AAA',
-    fontWeight: '500',
     fontFamily: "Mulish-Medium",
   },
 
@@ -467,7 +501,6 @@ const styles = StyleSheet.create({
   progressBadgeText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
     fontFamily: "Mulish-Bold",
   },
 
@@ -476,7 +509,6 @@ const styles = StyleSheet.create({
   },
   courseTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
     color: '#fff',
     marginBottom: 8,
     lineHeight: 26,
@@ -505,7 +537,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#AAA',
     marginLeft: 6,
-    fontWeight: '500',
     fontFamily: "Mulish-Medium",
   },
 
@@ -529,7 +560,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#AAA',
     textAlign: 'center',
-    fontWeight: '500',
     fontFamily: "Mulish-Medium",
   },
 
@@ -551,7 +581,6 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '600',
     fontFamily: "Mulish-SemiBold",
   },
   deletedCourseCard: {
@@ -572,7 +601,6 @@ const styles = StyleSheet.create({
   deletedButtonText: {
     color: '#FF6B6B',
     fontSize: 15,
-    fontWeight: '600',
     fontFamily: "Mulish-SemiBold",
   },
 
@@ -593,52 +621,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    gap: 16,
   },
   errorIcon: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   emptyIcon: {
-    marginBottom: 24,
+    marginBottom: 8,
   },
   errorTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-    textAlign: 'center',
+    color: "#fff",
+    textAlign: "center",
     fontFamily: "Mulish-Bold",
   },
   emptyTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 12,
-    textAlign: 'center',
+    color: "#fff",
+    textAlign: "center",
     fontFamily: "Mulish-Bold",
   },
   errorText: {
     fontSize: 16,
-    color: '#AAA',
-    textAlign: 'center',
+    color: "#AAA",
+    textAlign: "center",
     lineHeight: 24,
-    marginBottom: 24,
     fontFamily: "Mulish-Regular",
   },
   emptyText: {
     fontSize: 16,
-    color: '#AAA',
-    textAlign: 'center',
+    color: "#AAA",
+    textAlign: "center",
     lineHeight: 24,
-    marginBottom: 32,
     fontFamily: "Mulish-Regular",
   },
   retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4CC2FF',
-    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#4CC2FF",
     paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 12,
+    marginTop: 8,
     shadowColor: "#4CC2FF",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -670,21 +695,18 @@ const styles = StyleSheet.create({
     borderColor: '#4CC2FF',
   },
   retryButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
     fontFamily: "Mulish-SemiBold",
   },
   exploreButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
     fontFamily: "Mulish-SemiBold",
   },
   refreshButtonText: {
     color: '#4CC2FF',
     fontSize: 14,
-    fontWeight: '500',
     fontFamily: "Mulish-Medium",
   },
 });

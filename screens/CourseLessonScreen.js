@@ -760,7 +760,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,
     fontFamily: "Mulish-SemiBold",
@@ -874,7 +873,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
     fontFamily: "Mulish-SemiBold",
   },
 });

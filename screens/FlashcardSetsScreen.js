@@ -153,12 +153,11 @@ export default function FlashcardSetsScreen() {
 
       // Get all flashcard sets
       const response = await flashcardService.getFlashcardSets(params);
-      const result = apiUtils.parseResponse(response);
 
-      if (result.data && Array.isArray(result.data)) {
-        setFlashcardSets(result.data);
-        setTotal(result.total || 0);
-        setTotalPages(result.totalPages || 0);
+      if (response.data.data && Array.isArray(response.data.data)) {
+        setFlashcardSets(response.data.data);
+        setTotal(response.data.total || 0);
+        setTotalPages(response.data.totalPages || 0);
       } else {
         setFlashcardSets([]);
         setTotal(0);

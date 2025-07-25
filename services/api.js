@@ -1,13 +1,12 @@
 import axios from "axios";
 import SecureStorage from "../utils/secureStorage";
-
+import { MOBILE_SERVER_URL } from "@env";
 // Get server URL from environment or use fallback
-const MOBILE_SERVER_URL =
-  process.env.MOBILE_SERVER_URL || "http://localhost:3000";
+const SERVER_URL = MOBILE_SERVER_URL;
 
 // Create axios instance
 const api = axios.create({
-  baseURL: MOBILE_SERVER_URL,
+  baseURL: SERVER_URL,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",

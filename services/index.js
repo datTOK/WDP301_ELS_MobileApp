@@ -1,35 +1,41 @@
 // API Services Index
 // Updated to include all services following backend API patterns and frontend web service structure
 
-// Core API
-export { default as api } from './api';
-export { apiUtils } from './api';
+import api, { apiUtils } from './api';
+import authService from './authService';
+import userService from './userService';
+import courseService from './courseService';
+import lessonService from './lessonService';
+import testService from './testService';
+import userCourseService from './userCourseService';
+import userLessonService from './userLessonService';
+import userTestService from './userTestService';
+import userExerciseService from './userExerciseService';
+import userAchievementService from './userAchievementService';
+import membershipService from './membershipService';
+import paymentService from './paymentService';
+import flashcardService from './flashcardService';
+import blogService from './blogService';
+import achievementService from './achievementService';
+import aiService from './aiService';
 
-// Auth Services
-export { default as authService } from './authService';
-
-// Course Services
-export { default as courseService } from './courseService';
-export { default as userCourseService } from './userCourseService';
-
-// Lesson Services
-export { default as lessonService } from './lessonService';
-export { default as userLessonService } from './userLessonService';
-
-// Exercise Services
-export { default as userExerciseService } from './userExerciseService';
-
-// Test Services
-export { default as testService } from './testService';
-export { default as userTestService } from './userTestService';
-
-// Achievement Services
-export { default as achievementService } from './achievementService';
-export { default as userAchievementService } from './userAchievementService';
-
-// Other Services
-export { default as aiService } from './aiService';
-export { default as blogService } from './blogService';
-export { default as flashcardService } from './flashcardService';
-export { default as membershipService } from './membershipService';
-export { default as userService } from './userService'; 
+export {
+  api,
+  apiUtils,
+  authService,
+  userService,
+  courseService,
+  lessonService,
+  testService,
+  userCourseService,
+  userLessonService,
+  userTestService,
+  userExerciseService,
+  userAchievementService,
+  membershipService,
+  paymentService,
+  flashcardService,
+  blogService,
+  achievementService,
+  aiService,
+}; 
