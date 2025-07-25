@@ -90,20 +90,32 @@ class UserService {
 
       // Process tests data
       if (userTestsResponse?.data) {
+        console.log(userTestsResponse.data)
         const tests = userTestsResponse.data.data || [];
-        userDetail.totalTests = tests.length;
-        userDetail.testsPassed = tests.filter(t => t.status === 'completed' && t.score >= 70).length;
         
-        // Calculate average score
-        const completedTests = tests.filter(t => t.status === 'completed' && t.score !== undefined);
+        // Group tests by testId to get latest attempt for each unique test
+        const testGroups = {};
+        tests.forEach(test => {
+          if (!testGroups[test.testId] || test.attemptNo > testGroups[test.testId].attemptNo) {
+            testGroups[test.testId] = test;
+          }
+        });
+        
+        // Get latest attempts only
+        const latestTests = Object.values(testGroups);
+        userDetail.totalTests = latestTests.length;
+        userDetail.testsPassed = latestTests.filter(t => t.status === 'passed').length;
+        
+        // Calculate average score from latest attempts
+        const completedTests = latestTests.filter(t => t.status === 'passed' || t.status === 'failed');
         if (completedTests.length > 0) {
           const totalScore = completedTests.reduce((sum, test) => sum + (test.score || 0), 0);
-          userDetail.averageScore = totalScore / completedTests.length;
+          userDetail.averageScore = Math.round((totalScore / completedTests.length) * 100) / 100; // Round to 2 decimal places
         } else {
           userDetail.averageScore = 0;
         }
         
-        console.log('Total tests:', userDetail.totalTests);
+        console.log('Total unique tests:', userDetail.totalTests);
         console.log('Tests passed:', userDetail.testsPassed);
         console.log('Average score:', userDetail.averageScore);
       }
@@ -135,6 +147,13 @@ class UserService {
       userDetail.averageScore = userDetail.averageScore || 0;
       userDetail.achievements = userDetail.achievements || 0;
       userDetail.recentAchievements = userDetail.recentAchievements || 0;
+      
+      // Ensure points and online streak are included
+      userDetail.points = userDetail.points || 0;
+      userDetail.onlineStreak = userDetail.onlineStreak || 0;
+      
+      console.log('User points:', userDetail.points);
+      console.log('Online streak:', userDetail.onlineStreak);
 
       console.log('Final user detail object:', userDetail);
       return userDetail;

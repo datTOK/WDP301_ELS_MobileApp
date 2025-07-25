@@ -62,7 +62,6 @@ export default function ProfileScreen({ navigation }) {
       const fetchUserStats = async () => {
         try {
           const userDetail = await userService.getUserDetailById(user._id);
-          console.log("test", userDetail)
           setUserStats(userDetail);
         } catch (statsError) {
           console.error('Error fetching user stats:', statsError);
@@ -120,6 +119,16 @@ export default function ProfileScreen({ navigation }) {
       
       {/* Main Stats Grid */}
       <View style={localStyles.statsGrid}>
+        <View style={localStyles.statItem}>
+          <Ionicons name="star" size={24} color="#ffd700" />
+          <Text style={localStyles.statNumber}>{userStats?.points || 0}</Text>
+          <Text style={localStyles.statLabel}>Points</Text>
+        </View>
+        <View style={localStyles.statItem}>
+          <Ionicons name="flame" size={24} color="#ff6b35" />
+          <Text style={localStyles.statNumber}>{userStats?.onlineStreak || 0}</Text>
+          <Text style={localStyles.statLabel}>Day Streak</Text>
+        </View>
         <View style={localStyles.statItem}>
           <Ionicons name="book-outline" size={24} color="#4CC2FF" />
           <Text style={localStyles.statNumber}>{userStats?.coursesCompleted || 0}</Text>
@@ -213,6 +222,31 @@ export default function ProfileScreen({ navigation }) {
                 : '0% Pass Rate'
               }
             </Text>
+          </View>
+
+          {/* Points & Streak Progress */}
+          <View style={localStyles.progressItem}>
+            <View style={localStyles.progressHeader}>
+              <Ionicons name="star" size={20} color="#ffd700" />
+              <Text style={localStyles.progressTitle}>Points & Streak</Text>
+            </View>
+            <View style={localStyles.progressStats}>
+              <Text style={localStyles.progressText}>
+                Total Points: {userStats?.points || 0}
+              </Text>
+              <Text style={localStyles.progressText}>
+                Online Streak: {userStats?.onlineStreak || 0} days
+              </Text>
+            </View>
+            <View style={localStyles.streakVisual}>
+              <View style={localStyles.streakCircle}>
+                <Ionicons name="flame" size={30} color="#ff6b35" />
+                <Text style={localStyles.streakNumber}>
+                  {userStats?.onlineStreak || 0}
+                </Text>
+                <Text style={localStyles.streakLabel}>Days</Text>
+              </View>
+            </View>
           </View>
 
           {/* Achievement Progress */}
@@ -727,6 +761,33 @@ const localStyles = StyleSheet.create({
     color: '#fff',
   },
   achievementLabel: {
+    fontSize: 12,
+    fontFamily: 'Mulish-Regular',
+    color: '#ccc',
+  },
+  streakVisual: {
+    width: 100,
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+  },
+  streakCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#2a2a2a',
+    borderWidth: 2,
+    borderColor: '#ff6b35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  streakNumber: {
+    fontSize: 20,
+    fontFamily: 'Mulish-Bold',
+    color: '#fff',
+    marginTop: 2,
+  },
+  streakLabel: {
     fontSize: 12,
     fontFamily: 'Mulish-Regular',
     color: '#ccc',
