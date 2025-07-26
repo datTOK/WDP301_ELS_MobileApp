@@ -71,8 +71,7 @@ class UserExerciseService {
    */
   async getUserExercisesByUserId(userId, params = {}) {
     const response = await api.get(`/api/user-exercises/${userId}/user`, { params });
-    // The backend returns { data: [...], page, totalPages, total, message }
-    return response.data.data || []; // returns the data array from the paginated response
+    return response.data.data || [];
   }
 
   /**
@@ -106,11 +105,9 @@ class UserExerciseService {
    */
   async getUserExercisesByLessonId(userId, lessonId) {
     try {
-      // Get all user exercises and filter by lesson
       const response = await api.get(`/api/user-exercises/${userId}/user?size=1000`);
       const allUserExercises = response.data.data || [];
       
-      // Filter to only include exercises from the current lesson
       return allUserExercises.filter((userExercise) => 
         userExercise.exercise?.lessonId === lessonId
       );
