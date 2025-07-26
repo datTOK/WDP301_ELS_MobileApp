@@ -573,6 +573,7 @@ export default function HomeScreen() {
   }
 
   return (
+    <>
     <ScrollView 
       style={[globalStyles.container, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={globalStyles.scrollContainer}
@@ -748,6 +749,8 @@ export default function HomeScreen() {
         style={styles.lottieAnimation} 
       />
     </ScrollView>
+    <AIChatBot />
+    </>
   );
 }
 
