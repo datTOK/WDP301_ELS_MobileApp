@@ -22,6 +22,7 @@ import FlashcardSetDetailScreen from '../screens/FlashcardSetDetailScreen';
 import CreateFlashcardSetScreen from '../screens/CreateFlashcardSetScreen';
 import EditFlashcardSetScreen from '../screens/EditFlashcardSetScreen';
 import MyFlashcardSetsScreen from '../screens/MyFlashcardSetsScreen';
+import AiRecommentdationScreen from '../screens/AiRecommentdationScreen';
 import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
@@ -94,6 +95,7 @@ export function ProfileStackScreen() {
       <Stack.Screen name="ProfileMain" component={ProfileScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <Stack.Screen name="Achievements" component={AchievementScreen} />
+      <Stack.Screen name="AiRecommendations" component={AiRecommentdationScreen} />
     </Stack.Navigator>
   );
 }

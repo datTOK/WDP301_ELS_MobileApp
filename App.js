@@ -32,6 +32,7 @@ import FlashcardSetsScreen from './screens/FlashcardSetsScreen';
 import FlashcardSetDetailScreen from './screens/FlashcardSetDetailScreen';
 import MyFlashcardSetsScreen from './screens/MyFlashcardSetsScreen';
 import CreateFlashcardSetScreen from './screens/CreateFlashcardSetScreen';
+import AiRecommentdationScreen from './screens/AiRecommentdationScreen';
 
 const Stack = createStackNavigator();
 
@@ -109,6 +110,7 @@ export default function App() {
                 <Stack.Screen name="Blog" component={BlogScreen} />
                 <Stack.Screen name="BlogDetail" component={BlogDetailScreen} />
                 <Stack.Screen name="Achievement" component={AchievementScreen} />
+                <Stack.Screen name="AiRecommendations" component={AiRecommentdationScreen} />
                 
                 {/* Flashcard Screens */}
                 <Stack.Screen name="FlashcardSets" component={FlashcardSetsScreen} />

@@ -318,6 +318,15 @@ export default function ProfileScreen({ navigation }) {
           <Text style={localStyles.actionText}>My Flashcards</Text>
           <Ionicons name="chevron-forward" size={20} color="#888" />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={localStyles.actionItem}
+          onPress={() => navigation.navigate('AiRecommendations')}
+        >
+          <Ionicons name="barbell-outline" size={20} color="#e472d1ff" />
+          <Text style={localStyles.actionText}>Ai Recommendations</Text>
+          <Ionicons name="chevron-forward" size={20} color="#888" />
+        </TouchableOpacity>
       </View>
     </Card>
   );
