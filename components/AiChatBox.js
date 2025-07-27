@@ -88,21 +88,16 @@ const AIChatBot = () => {
       // Log the full error object to understand its structure
       console.error('Error caught in handleAskAI:', error);
 
-      let errorMessage = 'Failed to get response from AI. Please try again later.';
+      let errorMessage = 'AI service is busy. Please try again later.';
       let statusCode = error.statusCode || error.response?.status; // Check both direct statusCode and axios response status
 
-      if (statusCode === 400) {
-        errorMessage = error.error || error.response?.data?.error || 'Invalid request to AI tutor.';
-      } else if (statusCode === 401 || statusCode === 403) {
-        errorMessage = error.error || error.response?.data?.error || 'Unauthorized to access AI tutor. Please log in again.';
-      } else if (statusCode === 500) {
-        errorMessage = error.error || error.response?.data?.error || 'AI tutor is currently unavailable. Please try again later.';
-      } else if (error.message) { // Catch generic JS errors or network errors
-        errorMessage = error.message;
-      }
-
+      if (statusCode === 401 || statusCode === 403) {
+        errorMessage = 'Authentication Required: Please log in again to use the AI tutor.';
+        showToast(errorMessage, 'error');
+        return;
+      } 
       setConversation((prev) => [...prev, { type: 'error', text: errorMessage }]);
-      showToast(`AI Error: ${errorMessage}`, 'error');
+      showToast(`Error: ${errorMessage}`, 'error');
     } finally {
       setLoading(false); // Set loading state to false after response or error
     }
