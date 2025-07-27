@@ -10,11 +10,13 @@ import { ToastProvider } from './context/ToastContext';
 import { ConfirmationProvider } from './context/ConfirmationContext';
 import Navigator from './navigation/Navigator';
 import LoadingSpinner from './components/LoadingSpinner';
+import SplashScreen from './components/SplashScreen';
 
 // Import all screens
 import LoginScreen from './screens/Auth/LoginScreen';
 import SignupScreen from './screens/Auth/SignupScreen';
 import ChangePasswordScreen from './screens/Auth/ChangePasswordScreen';
+import ForgotPasswordScreen from './screens/Auth/ForgotPasswordScreen';
 import HomeScreen from './screens/HomeScreen';
 import CoursesScreen from './screens/CoursesScreen';
 import CourseDetailScreen from './screens/CourseDetailScreen';
@@ -38,6 +40,7 @@ const Stack = createStackNavigator();
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -68,6 +71,16 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  const handleSplashFinish = () => {
+    setShowSplash(false);
+  };
+
+  // Show splash screen first
+  if (showSplash) {
+    return <SplashScreen onFinish={handleSplashFinish} />;
+  }
+
+  // Show loading spinner while fonts are loading
   if (isLoading || !fontsLoaded) {
     return (
       <View style={{ flex: 1, backgroundColor: '#202020', justifyContent: 'center', alignItems: 'center' }}>
@@ -94,6 +107,7 @@ export default function App() {
                 <Stack.Screen name="Login" component={LoginScreen} />
                 <Stack.Screen name="Signup" component={SignupScreen} />
                 <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+                <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                 
                 {/* Main App Screens */}
                 <Stack.Screen name="Main" component={Navigator} />
