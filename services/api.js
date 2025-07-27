@@ -3,7 +3,7 @@ import SecureStorage from "../utils/secureStorage";
 import { MOBILE_SERVER_URL } from "@env";
 // Get server URL from environment or use fallback
 const SERVER_URL = MOBILE_SERVER_URL;
-
+console.log("server:", SERVER_URL);
 // Create axios instance
 const api = axios.create({
   baseURL: SERVER_URL,
