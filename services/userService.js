@@ -53,15 +53,12 @@ class UserService {
     try {
       console.log('Getting user details for ID:', userId);
       
-      // Get basic user info
       const userResponse = await api.get(`/api/users/${userId}`);
       const user = userResponse.data.user;
       console.log('Basic user info:', user);
 
-      // Initialize user detail object
       const userDetail = { ...user };
 
-      // Try to get additional stats from various endpoints
       const userCoursesResponse = await api.get(`/api/user-courses/${userId}/user`).catch((error) => {
         console.error('Error fetching user courses:', error);
         return { data: null };
@@ -77,7 +74,6 @@ class UserService {
         return { data: null };
       });
 
-      // Process courses data
       if (userCoursesResponse?.data) {
         const courses = userCoursesResponse.data.data || [];
         userDetail.totalCourses = courses.length;
@@ -88,12 +84,10 @@ class UserService {
         console.log('Courses in progress:', userDetail.coursesInProgress);
       }
 
-      // Process tests data
       if (userTestsResponse?.data) {
         console.log(userTestsResponse.data)
         const tests = userTestsResponse.data.data || [];
         
-        // Group tests by testId to get latest attempt for each unique test
         const testGroups = {};
         tests.forEach(test => {
           if (!testGroups[test.testId] || test.attemptNo > testGroups[test.testId].attemptNo) {
@@ -101,16 +95,14 @@ class UserService {
           }
         });
         
-        // Get latest attempts only
         const latestTests = Object.values(testGroups);
         userDetail.totalTests = latestTests.length;
         userDetail.testsPassed = latestTests.filter(t => t.status === 'passed').length;
         
-        // Calculate average score from latest attempts
         const completedTests = latestTests.filter(t => t.status === 'passed' || t.status === 'failed');
         if (completedTests.length > 0) {
           const totalScore = completedTests.reduce((sum, test) => sum + (test.score || 0), 0);
-          userDetail.averageScore = Math.round((totalScore / completedTests.length) * 100) / 100; // Round to 2 decimal places
+          userDetail.averageScore = Math.round((totalScore / completedTests.length) * 100) / 100;
         } else {
           userDetail.averageScore = 0;
         }
@@ -120,12 +112,10 @@ class UserService {
         console.log('Average score:', userDetail.averageScore);
       }
 
-      // Process achievements data
       if (userAchievementsResponse?.data) {
         const achievements = userAchievementsResponse.data.data || [];
         userDetail.achievements = achievements.length;
         
-        // Calculate recent achievements (last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
@@ -138,7 +128,6 @@ class UserService {
         console.log('Recent achievements:', userDetail.recentAchievements);
       }
 
-      // Set default values for missing stats
       userDetail.totalCourses = userDetail.totalCourses || 0;
       userDetail.coursesCompleted = userDetail.coursesCompleted || 0;
       userDetail.coursesInProgress = userDetail.coursesInProgress || 0;
@@ -148,7 +137,6 @@ class UserService {
       userDetail.achievements = userDetail.achievements || 0;
       userDetail.recentAchievements = userDetail.recentAchievements || 0;
       
-      // Ensure points and online streak are included
       userDetail.points = userDetail.points || 0;
       userDetail.onlineStreak = userDetail.onlineStreak || 0;
       
@@ -159,7 +147,6 @@ class UserService {
       return userDetail;
     } catch (error) {
       console.error('Error fetching user details:', error);
-      // Return basic user info if detailed fetch fails
       return user;
     }
   }

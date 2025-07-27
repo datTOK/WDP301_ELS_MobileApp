@@ -99,17 +99,7 @@ export default function LoginScreen({ navigation }) {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Back to Home Button */}
-      <View style={localStyles.headerNav}>
-        <TouchableOpacity
-          style={localStyles.backButton}
-          onPress={() => navigation.navigate("GuestHome")}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-          <Text style={localStyles.backButtonText}>Home</Text>
-        </TouchableOpacity>
-      </View>
+
 
       <ScrollView
         contentContainerStyle={[
@@ -184,7 +174,7 @@ export default function LoginScreen({ navigation }) {
 
           <TouchableOpacity
             style={localStyles.forgotPasswordButton}
-            onPress={() => navigation.navigate("ChangePassword")}
+            onPress={() => navigation.navigate("ForgotPassword")}
           >
             <Text style={localStyles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>

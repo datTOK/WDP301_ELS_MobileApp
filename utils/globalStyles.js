@@ -1,9 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { fonts, convertFontWeightToFontFamily } from './fonts';
 
-// ELS Website-inspired design system
 export const createGlobalStyles = (theme) => {
-  // Safety check for theme
   if (!theme || !theme.colors) {
     console.warn('Theme is undefined or missing colors, using fallback theme');
     theme = {
@@ -59,7 +57,6 @@ export const createGlobalStyles = (theme) => {
   }
 
   return StyleSheet.create({
-    // Layout & Container Styles
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
@@ -75,7 +72,6 @@ export const createGlobalStyles = (theme) => {
       backgroundColor: theme.colors.background,
     },
   
-    // Card & Surface Styles (matching ELS website)
     card: {
       backgroundColor: theme.colors.cardBackground,
       borderWidth: 1,
@@ -103,9 +99,8 @@ export const createGlobalStyles = (theme) => {
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
-    },
-  
-    // Header & Navigation Styles
+        },
+
     header: {
       backgroundColor: theme.colors.cardBackground,
       borderBottomWidth: 1,
@@ -119,9 +114,8 @@ export const createGlobalStyles = (theme) => {
       fontFamily: theme.typography.fontFamily.bold,
       color: theme.colors.text,
       textAlign: 'center',
-    },
-  
-    // Typography Styles
+        },
+
     title: {
       fontSize: theme.typography.fontSize.xxxl,
       fontFamily: theme.typography.fontFamily.bold,
@@ -154,27 +148,25 @@ export const createGlobalStyles = (theme) => {
       fontSize: theme.typography.fontSize.sm,
       fontFamily: theme.typography.fontFamily.regular,
       color: theme.colors.textSecondary,
-    },
-  
-    // Button Styles (matching ELS website exactly)
+        },
+
     button: {
       backgroundColor: theme.colors.buttonBackground,
-      borderRadius: theme.borderRadius.md, // 5px like web
-      paddingVertical: theme.spacing.sm + 2, // Slightly more padding for mobile
+      borderRadius: theme.borderRadius.md,
+      paddingVertical: theme.spacing.sm + 2,
       paddingHorizontal: theme.spacing.md,
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: 44,
-      minWidth: 130, // Matching web's min-width
+      minWidth: 130,
     },
   
     buttonText: {
-      color: theme.colors.buttonText, // Black text on blue buttons
-      fontSize: theme.typography.fontSize.sm, // 13px like web
+      color: theme.colors.buttonText,
+      fontSize: theme.typography.fontSize.sm,
       fontFamily: theme.typography.fontFamily.medium,
     },
   
-    // Secondary button (gray button like web)
     buttonSecondary: {
       backgroundColor: theme.colors.buttonSecondary || theme.colors.buttonDisabled,
       borderRadius: theme.borderRadius.md,
@@ -226,31 +218,30 @@ export const createGlobalStyles = (theme) => {
       color: theme.colors.textMuted,
       fontSize: theme.typography.fontSize.sm,
       fontFamily: theme.typography.fontFamily.medium,
-    },
-  
-    // Input Styles (matching ELS website exactly)
+        },
+
     input: {
-      backgroundColor: theme.colors.surfaceBackground, // #2D2D2D for dark mode
-      borderWidth: 1,
-      borderColor: theme.colors.borderColor, // Bottom border like web
-      borderBottomWidth: 2, // Thicker bottom border like web
-      borderBottomColor: theme.colors.textMuted, // #999999 like web
-      borderRadius: theme.borderRadius.md, // 5px like web
-      paddingVertical: theme.spacing.sm,
-      paddingHorizontal: theme.spacing.sm + 4, // 12px like web
-      fontSize: theme.typography.fontSize.sm, // 13px like web
-      fontFamily: theme.typography.fontFamily.regular,
-      color: theme.colors.text,
-      minHeight: 44,
-      minWidth: 280, // Matching web's min-width
-    },
-  
-    inputFocused: {
-      backgroundColor: theme.colors.background === '#202020' ? '#1F1F1F' : theme.colors.surfaceBackground, // Darker on focus like web
+      backgroundColor: theme.colors.surfaceBackground,
       borderWidth: 1,
       borderColor: theme.colors.borderColor,
       borderBottomWidth: 2,
-      borderBottomColor: theme.colors.primary, // Blue border on focus
+      borderBottomColor: theme.colors.textMuted,
+      borderRadius: theme.borderRadius.md,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.sm + 4,
+      fontSize: theme.typography.fontSize.sm,
+      fontFamily: theme.typography.fontFamily.regular,
+      color: theme.colors.text,
+      minHeight: 44,
+      minWidth: 280,
+    },
+  
+    inputFocused: {
+      backgroundColor: theme.colors.background === '#202020' ? '#1F1F1F' : theme.colors.surfaceBackground,
+      borderWidth: 1,
+      borderColor: theme.colors.borderColor,
+      borderBottomWidth: 2,
+      borderBottomColor: theme.colors.primary,
       borderRadius: theme.borderRadius.md,
       paddingVertical: theme.spacing.sm,
       paddingHorizontal: theme.spacing.sm + 4,

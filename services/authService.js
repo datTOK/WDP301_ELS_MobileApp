@@ -49,9 +49,19 @@ class AuthService {
   }
 
   /**
+   * Confirm reset password PIN
+   * @param {string} email - User email
+   * @param {string} pin - 6-digit PIN
+   * @returns {Promise<Object>} PIN confirmation response
+   */
+  async confirmResetPasswordPin(email, pin) {
+    return api.post('/api/auth/confirm-reset-password-pin', { email, pin });
+  }
+
+  /**
    * Reset password with token
    * @param {Object} resetData - Password reset data
-   * @param {string} resetData.token - Reset token
+   * @param {string} resetData.email - User email
    * @param {string} resetData.newPassword - New password
    * @returns {Promise<Object>} Password reset response
    */

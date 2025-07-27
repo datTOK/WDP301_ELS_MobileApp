@@ -20,7 +20,9 @@ import TestScreenDetail from '../screens/TestScreenDetail';
 import FlashcardSetsScreen from '../screens/FlashcardSetsScreen';
 import FlashcardSetDetailScreen from '../screens/FlashcardSetDetailScreen';
 import CreateFlashcardSetScreen from '../screens/CreateFlashcardSetScreen';
+import EditFlashcardSetScreen from '../screens/EditFlashcardSetScreen';
 import MyFlashcardSetsScreen from '../screens/MyFlashcardSetsScreen';
+import AiRecommentdationScreen from '../screens/AiRecommentdationScreen';
 import { useAuth } from '../context/AuthContext';
 
 const Tab = createBottomTabNavigator();
@@ -47,6 +49,13 @@ function FlashcardStackScreen() {
       <Stack.Screen
         name="CreateFlashcardSet"
         component={CreateFlashcardSetScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="EditFlashcardSet"
+        component={EditFlashcardSetScreen}
         options={{
           headerShown: false,
         }}
@@ -83,9 +92,10 @@ export function ProfileStackScreen() {
         cardStyle: { backgroundColor: '#202020' },
       }}
     >
-      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="ProfileMain" component={ProfileScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <Stack.Screen name="Achievements" component={AchievementScreen} />
+      <Stack.Screen name="AiRecommendations" component={AiRecommentdationScreen} />
     </Stack.Navigator>
   );
 }
