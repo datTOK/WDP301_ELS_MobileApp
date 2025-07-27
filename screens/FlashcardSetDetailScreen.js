@@ -89,15 +89,29 @@ export default function FlashcardSetDetailScreen() {
     fetchFlashcardSetDetails();
   }, [setId]);
 
+  // Listen for focus events to refresh data when returning from edit screen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Refresh data when screen comes into focus
+      fetchFlashcardSetDetails(true);
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchFlashcardSetDetails(true);
   };
 
+  const handleEditFlashcardSet = () => {
+    navigation.navigate('EditFlashcardSet', { setId });
+  };
+
   const handleDeleteFlashcardSet = () => {
     confirmDelete(flashcardSet?.name || "this flashcard set", async () => {
       try {
-        await flashcardSetService.deleteFlashcardSet(setId);
+        await flashcardService.deleteFlashcardSet(setId);
         showSuccess("Flashcard set deleted successfully");
         navigation.goBack();
       } catch (err) {
@@ -812,30 +826,63 @@ export default function FlashcardSetDetailScreen() {
         </Card>
       )}
 
-      {/* Delete Button (Owner Only) */}
+      {/* Action Buttons (Owner Only) */}
       {isOwner && (
-        <Card
-          containerStyle={[
-            styles.deleteCard,
-            {
-              backgroundColor: theme.colors.cardBackground,
-              borderColor: theme.colors.borderColor,
-            },
-          ]}
-        >
-          <Button
-            title="Delete Flashcard Set"
-            icon={{
-              name: "trash-outline",
-              type: "ionicon",
-              size: 20,
-              color: "#fff",
-            }}
-            buttonStyle={styles.deleteButton}
-            titleStyle={styles.deleteButtonText}
-            onPress={handleDeleteFlashcardSet}
-          />
-        </Card>
+        <>
+          {/* Edit Button */}
+          <Card
+            containerStyle={[
+              styles.actionCard,
+              {
+                backgroundColor: theme.colors.cardBackground,
+                borderColor: theme.colors.borderColor,
+              },
+            ]}
+          >
+            <Button
+              title="Edit Flashcard Set"
+              icon={{
+                name: "pencil-outline",
+                type: "ionicon",
+                size: 20,
+                color: theme.colors.buttonText,
+              }}
+              buttonStyle={[
+                styles.editButton,
+                { backgroundColor: theme.colors.secondary || "#8B5CF6" },
+              ]}
+              titleStyle={[
+                styles.editButtonText,
+                { color: theme.colors.buttonText },
+              ]}
+              onPress={handleEditFlashcardSet}
+            />
+          </Card>
+
+          {/* Delete Button */}
+          <Card
+            containerStyle={[
+              styles.deleteCard,
+              {
+                backgroundColor: theme.colors.cardBackground,
+                borderColor: theme.colors.borderColor,
+              },
+            ]}
+          >
+            <Button
+              title="Delete Flashcard Set"
+              icon={{
+                name: "trash-outline",
+                type: "ionicon",
+                size: 20,
+                color: "#fff",
+              }}
+              buttonStyle={styles.deleteButton}
+              titleStyle={styles.deleteButtonText}
+              onPress={handleDeleteFlashcardSet}
+            />
+          </Card>
+        </>
       )}
 
       {/* Create/Edit Flashcard Modal */}
@@ -1118,6 +1165,20 @@ const styles = StyleSheet.create({
     fontFamily: "Mulish-Regular",
     marginTop: 10,
     textAlign: "center",
+  },
+  actionCard: {
+    borderRadius: 12,
+    margin: 15,
+    marginBottom: 8,
+    padding: 20,
+  },
+  editButton: {
+    borderRadius: 12,
+    paddingVertical: 15,
+  },
+  editButtonText: {
+    fontSize: 16,
+    fontFamily: "Mulish-Bold",
   },
   deleteCard: {
     borderRadius: 12,
