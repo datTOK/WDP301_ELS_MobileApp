@@ -1,4 +1,5 @@
 import api from "./api";
+import lessonService from "./lessonService";
 
 /**
  * User Lesson Service
@@ -103,6 +104,26 @@ class UserLessonService {
   async getAllUserLessons(userId) {
     const response = await this.getUserLessonsByUserId(userId, { size: 1000 });
     return response.data || [];
+  }
+
+  /**
+   * Get user lessons by course ID for a specific user
+   * @param {string} userId - User ID
+   * @param {string} courseId - Course ID
+   * @returns {Promise<Array>} User lessons for the course
+   */
+  async getUserLessonsByCourseId(userId, courseId) {
+    // First get all user lessons for the user
+    const allUserLessons = await this.getAllUserLessons(userId);
+    
+    // Then get all lessons for the course to filter by lesson IDs
+    const courseLessons = await lessonService.getLessonsByCourseId(courseId, { size: 1000 });
+    const courseLessonIds = (courseLessons.data || []).map(lesson => lesson._id);
+    
+    // Filter user lessons to only include those from this course
+    return allUserLessons.filter(userLesson => 
+      courseLessonIds.includes(userLesson.lessonId)
+    );
   }
 }
 

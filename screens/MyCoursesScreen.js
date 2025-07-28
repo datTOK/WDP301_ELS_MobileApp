@@ -13,20 +13,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { Card } from 'react-native-elements';
 import { useToast } from '../context/ToastContext';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { userCourseService, courseService, apiUtils } from '../services';
+import { userCourseService, courseService, lessonService, userLessonService, apiUtils } from '../services';
 
 const { width } = Dimensions.get("window");
 
 const MyCourseCard = ({ course, navigation, progress }) => {
   const [imageError, setImageError] = useState(false);
 
+  const handleCoursePress = () => {
+    if (course.isDeleted) {
+      // Don't navigate for deleted courses
+      return;
+    }
+    navigation.navigate('CourseOverview', { courseId: course._id });
+  };
+
   return (
     <TouchableOpacity
-      style={styles.courseCard}
-      onPress={() => navigation.navigate('CourseOverview', { courseId: course._id })}
-      activeOpacity={0.8}
+      style={[styles.courseCard, course.isDeleted && styles.deletedCourseCard]}
+      onPress={handleCoursePress}
+      activeOpacity={course.isDeleted ? 1 : 0.8}
+      disabled={course.isDeleted}
     >
       <View style={styles.imageContainer}>
         <Image
@@ -85,23 +94,30 @@ const MyCourseCard = ({ course, navigation, progress }) => {
         )}
 
         {/* Action Button */}
-        <TouchableOpacity
-          style={styles.continueButton}
-          onPress={() => navigation.navigate('CourseLesson', { 
-            courseId: course._id, 
-            courseName: course.name 
-          })}
-        >
-          <Ionicons 
-            name={progress === 100 ? "refresh" : "play"} 
-            size={16} 
-            color="#fff" 
-            style={{ marginRight: 6 }}
-          />
-          <Text style={styles.continueButtonText}>
-            {progress === 100 ? "Review" : "Continue"}
-          </Text>
-        </TouchableOpacity>
+        {!course.isDeleted ? (
+          <TouchableOpacity
+            style={styles.continueButton}
+            onPress={() => navigation.navigate('CourseLesson', { 
+              courseId: course._id, 
+              courseName: course.name 
+            })}
+          >
+            <Ionicons 
+              name={progress === 100 ? "refresh" : "play"} 
+              size={16} 
+              color="#fff" 
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.continueButtonText}>
+              {progress === 100 ? "Review" : "Continue"}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.deletedButton}>
+            <Ionicons name="close-circle" size={16} color="#FF6B6B" style={{ marginRight: 6 }} />
+            <Text style={styles.deletedButtonText}>Course Unavailable</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -116,6 +132,7 @@ const MyCoursesScreen = ({ navigation }) => {
   
   const { user } = useAuth();
   const { showError } = useToast();
+  const nav = useNavigation();
 
   // Fetch courses on component mount and focus
   useEffect(() => {
@@ -144,25 +161,22 @@ const MyCoursesScreen = ({ navigation }) => {
       // Fetch user courses
       const response = await userCourseService.getUserCoursesByUserId(user._id, {
         page: 1,
-        size: 100
+        size: 9999
       });
-      
-      const result = apiUtils.parseResponse(response);
 
-      if (!result.data || !Array.isArray(result.data)) {
+      if (!response.data || !Array.isArray(response.data)) {
         setCourses([]);
         setCourseProgress({});
         return;
       }
 
       // Fetch detailed course information for each enrolled course
-      const courseDetailsPromises = result.data.map(async (userCourse) => {
+      const courseDetailsPromises = response.data.map(async (userCourse) => {
         try {
           const courseResponse = await courseService.getCourseById(userCourse.courseId);
-          const courseResult = apiUtils.parseResponse(courseResponse);
           
-          if (courseResult.data) {
-            const courseData = courseResult.data.course || courseResult.data;
+          if (courseResponse && courseResponse.course) {
+            const courseData = courseResponse.course;
             return {
               ...courseData,
               userCourse,
@@ -172,7 +186,18 @@ const MyCoursesScreen = ({ navigation }) => {
           return null;
         } catch (courseError) {
           console.error('Error fetching course details:', userCourse.courseId, courseError);
-          return null;
+          // Return a placeholder course object for deleted courses
+          return {
+            _id: userCourse.courseId,
+            name: 'Course Unavailable',
+            description: 'This course is no longer available.',
+            coverImage: null,
+            level: 'Unknown',
+            createdAt: userCourse.createdAt,
+            userCourse,
+            enrolledAt: userCourse.createdAt,
+            isDeleted: true,
+          };
         }
       });
 
@@ -181,14 +206,50 @@ const MyCoursesScreen = ({ navigation }) => {
 
       setCourses(validCourses);
 
-      // Calculate progress for each course
+      // Calculate progress for each course by counting completed lessons
       const progressData = {};
-      validCourses.forEach(course => {
-        if (course.userCourse) {
-          // Use actual progress data if available
-          progressData[course._id] = Math.round(course.userCourse.averageScore || 0);
+      await Promise.all(validCourses.map(async (course) => {
+        if (course.isDeleted) {
+          progressData[course._id] = 0;
+          return;
         }
-      });
+
+        try {
+          // Get all lessons for this course
+          const lessonsResponse = await lessonService.getLessonsByCourseId(course._id, {
+            page: 1,
+            size: 9999
+          });
+          
+          const lessons = lessonsResponse.data || [];
+          const totalLessons = lessons.length;
+          
+          if (totalLessons === 0) {
+            progressData[course._id] = 0;
+            return;
+          }
+
+          // Get user lessons for this specific course using the optimized method
+          const userLessons = await userLessonService.getUserLessonsByCourseId(user._id, course._id);
+          
+          // Count completed lessons for this specific course
+          const completedLessons = userLessons.filter(userLesson => 
+            userLesson.status === 'completed'
+          ).length;
+
+          // Calculate progress percentage
+          const progressPercentage = Math.round((completedLessons / totalLessons) * 100);
+          progressData[course._id] = progressPercentage;
+          
+          console.log(`Course ${course.name}: ${completedLessons}/${totalLessons} lessons completed (${progressPercentage}%)`);
+          
+        } catch (error) {
+          console.error('Error calculating progress for course:', course._id, error);
+          // Fallback to averageScore if available, otherwise 0
+          progressData[course._id] = Math.round(course.userCourse?.averageScore || 0);
+        }
+      }));
+
       setCourseProgress(progressData);
 
     } catch (err) {
@@ -224,6 +285,16 @@ const MyCoursesScreen = ({ navigation }) => {
   if (error) {
     return (
       <View style={styles.container}>
+        {/* Back Button for Error State */}
+        <View style={styles.errorHeader}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => nav.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        
         <View style={styles.errorContainer}>
           <View style={styles.errorIcon}>
             <Ionicons name="alert-circle" size={64} color="#FF6B6B" />
@@ -243,6 +314,16 @@ const MyCoursesScreen = ({ navigation }) => {
   if (!loading && courses.length === 0) {
     return (
       <View style={styles.container}>
+        {/* Back Button for Empty State */}
+        <View style={styles.errorHeader}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => nav.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIcon}>
             <Ionicons name="school-outline" size={80} color="#666" />
@@ -274,9 +355,18 @@ const MyCoursesScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.headerContainer}>
         <View style={styles.headerContent}>
-          <View style={styles.titleContainer}>
-            <Ionicons name="school" size={28} color="#4CC2FF" style={{ marginRight: 12 }} />
-            <Text style={styles.headerTitle}>My Courses</Text>
+          <View style={styles.headerTop}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => nav.goBack()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <Ionicons name="school" size={28} color="#4CC2FF" style={{ marginRight: 12 }} />
+              <Text style={styles.headerTitle}>My Courses</Text>
+            </View>
+            <View style={styles.headerSpacer} />
           </View>
           <Text style={styles.headerSubtitle}>
             {courses.length} course{courses.length !== 1 ? "s" : ""} enrolled
@@ -332,6 +422,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(76, 194, 255, 0.1)',
     borderRadius: 16,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  headerSpacer: {
+    width: 40,
+  },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -339,14 +443,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
     color: '#fff',
     fontFamily: "Mulish-Bold",
   },
   headerSubtitle: {
     fontSize: 15,
     color: '#AAA',
-    fontWeight: '500',
     fontFamily: "Mulish-Medium",
   },
 
@@ -399,7 +501,6 @@ const styles = StyleSheet.create({
   progressBadgeText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
     fontFamily: "Mulish-Bold",
   },
 
@@ -408,7 +509,6 @@ const styles = StyleSheet.create({
   },
   courseTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
     color: '#fff',
     marginBottom: 8,
     lineHeight: 26,
@@ -437,7 +537,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#AAA',
     marginLeft: 6,
-    fontWeight: '500',
     fontFamily: "Mulish-Medium",
   },
 
@@ -461,7 +560,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#AAA',
     textAlign: 'center',
-    fontWeight: '500',
     fontFamily: "Mulish-Medium",
   },
 
@@ -483,11 +581,35 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: "Mulish-SemiBold",
+  },
+  deletedCourseCard: {
+    opacity: 0.6,
+    backgroundColor: '#1A1A1A',
+  },
+  deletedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
+  deletedButtonText: {
+    color: '#FF6B6B',
+    fontSize: 15,
     fontFamily: "Mulish-SemiBold",
   },
 
   // Error States
+  errorHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -499,52 +621,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+    gap: 16,
   },
   errorIcon: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   emptyIcon: {
-    marginBottom: 24,
+    marginBottom: 8,
   },
   errorTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-    textAlign: 'center',
+    color: "#fff",
+    textAlign: "center",
     fontFamily: "Mulish-Bold",
   },
   emptyTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 12,
-    textAlign: 'center',
+    color: "#fff",
+    textAlign: "center",
     fontFamily: "Mulish-Bold",
   },
   errorText: {
     fontSize: 16,
-    color: '#AAA',
-    textAlign: 'center',
+    color: "#AAA",
+    textAlign: "center",
     lineHeight: 24,
-    marginBottom: 24,
     fontFamily: "Mulish-Regular",
   },
   emptyText: {
     fontSize: 16,
-    color: '#AAA',
-    textAlign: 'center',
+    color: "#AAA",
+    textAlign: "center",
     lineHeight: 24,
-    marginBottom: 32,
     fontFamily: "Mulish-Regular",
   },
   retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4CC2FF',
-    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#4CC2FF",
     paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 12,
+    marginTop: 8,
     shadowColor: "#4CC2FF",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -576,21 +695,18 @@ const styles = StyleSheet.create({
     borderColor: '#4CC2FF',
   },
   retryButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
     fontFamily: "Mulish-SemiBold",
   },
   exploreButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
     fontFamily: "Mulish-SemiBold",
   },
   refreshButtonText: {
     color: '#4CC2FF',
     fontSize: 14,
-    fontWeight: '500',
     fontFamily: "Mulish-Medium",
   },
 });

@@ -64,9 +64,9 @@ export default function LoginScreen({ navigation }) {
     setIsLoading(true);
     try {
       const response = await authService.login({ email, password });
-
+      console.log("response", response);
       const result = apiUtils.parseResponse(response);
-
+      console.log("result", result);
       if (result.data?.accessToken) {
         try {
           await signIn(result.data.accessToken);
@@ -82,6 +82,7 @@ export default function LoginScreen({ navigation }) {
         showError("Invalid response from server");
       }
     } catch (error) {
+      console.log(JSON.stringify(error, null, 2));
       const errorInfo = apiUtils.handleError(error);
       showError(errorInfo.message);
     } finally {
@@ -98,17 +99,7 @@ export default function LoginScreen({ navigation }) {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Back to Home Button */}
-      <View style={localStyles.headerNav}>
-        <TouchableOpacity
-          style={localStyles.backButton}
-          onPress={() => navigation.navigate("GuestHome")}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
-          <Text style={localStyles.backButtonText}>Home</Text>
-        </TouchableOpacity>
-      </View>
+
 
       <ScrollView
         contentContainerStyle={[
@@ -183,7 +174,7 @@ export default function LoginScreen({ navigation }) {
 
           <TouchableOpacity
             style={localStyles.forgotPasswordButton}
-            onPress={() => navigation.navigate("ChangePassword")}
+            onPress={() => navigation.navigate("ForgotPassword")}
           >
             <Text style={localStyles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>

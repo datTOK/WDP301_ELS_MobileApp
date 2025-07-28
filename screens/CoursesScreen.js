@@ -708,7 +708,6 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
     color: "#fff",
     textAlign: "center",
     fontFamily: "Mulish-Bold",
@@ -738,7 +737,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
     fontFamily: "Mulish-SemiBold",
   },
   emptyContainer: {
@@ -753,7 +751,6 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
     color: "#fff",
     textAlign: "center",
     fontFamily: "Mulish-Bold",

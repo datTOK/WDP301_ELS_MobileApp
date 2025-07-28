@@ -16,6 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { createGlobalStyles } from '../utils/globalStyles';
 import LoadingSpinner from '../components/LoadingSpinner';
+import PaymentModal from '../components/PaymentModal';
 import { membershipService, apiUtils } from '../services';
 
 const { width } = Dimensions.get('window');
@@ -100,34 +101,43 @@ const MembershipCard = ({ membership, index, theme, onSubscribe }) => {
       {/* Details */}
       <View style={localStyles.membershipDetails}>
         <View style={localStyles.detailRow}>
-          <Text style={[localStyles.detailLabel, { color: theme.colors.textSecondary }]}>
-            Duration:
-          </Text>
-          <Text style={[localStyles.detailValue, { color: theme.colors.text }]}>
+          <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
+          <Text style={[localStyles.detailText, { color: theme.colors.textSecondary }]}>
             {formatDuration(membership.duration)}
           </Text>
         </View>
         <View style={localStyles.detailRow}>
-          <Text style={[localStyles.detailLabel, { color: theme.colors.textSecondary }]}>
-            Price:
-          </Text>
-          <Text style={[localStyles.priceValue, { color: theme.colors.text }]}>
-            {formatPrice(membership.price)}
+          <Ionicons name="checkmark-circle-outline" size={16} color={theme.colors.textSecondary} />
+          <Text style={[localStyles.detailText, { color: theme.colors.textSecondary }]}>
+            Full access to all courses
           </Text>
         </View>
+        <View style={localStyles.detailRow}>
+          <Ionicons name="checkmark-circle-outline" size={16} color={theme.colors.textSecondary} />
+          <Text style={[localStyles.detailText, { color: theme.colors.textSecondary }]}>
+            Priority support
+          </Text>
+        </View>
+      </View>
+
+      {/* Price */}
+      <View style={localStyles.priceContainer}>
+        <Text style={[localStyles.price, { color: theme.colors.text }]}>
+          {formatPrice(membership.price)}
+        </Text>
       </View>
 
       {/* Subscribe Button */}
       <TouchableOpacity
         style={[
           localStyles.subscribeButton,
-          { borderColor: cardColor + '50' },
+          { backgroundColor: cardColor },
         ]}
         onPress={() => onSubscribe(membership)}
         activeOpacity={0.8}
       >
-        <Text style={[localStyles.subscribeButtonText, { color: cardColor }]}>
-          Subscribe
+        <Text style={[localStyles.subscribeButtonText, { color: 'white' }]}>
+          Subscribe Now
         </Text>
       </TouchableOpacity>
     </Animated.View>
@@ -135,33 +145,27 @@ const MembershipCard = ({ membership, index, theme, onSubscribe }) => {
 };
 
 export default function MembershipScreen() {
+  const { userToken } = useAuth();
+  const { theme } = useTheme();
+  const { showToast } = useToast();
+  const styles = createGlobalStyles(theme);
+
   const [memberships, setMemberships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-
-  const { userToken } = useAuth();
-  const { theme } = useTheme();
-  const { showError, showSuccess, showInfo } = useToast();
-  const styles = createGlobalStyles(theme);
+  const [selectedMembership, setSelectedMembership] = useState(null);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
 
   const headerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animate header on mount
     Animated.timing(headerAnim, {
       toValue: 1,
       duration: 800,
       useNativeDriver: true,
     }).start();
   }, []);
-
-  // Fetch memberships when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      fetchMemberships();
-    }, [])
-  );
 
   const fetchMemberships = async () => {
     try {
@@ -173,23 +177,23 @@ export default function MembershipScreen() {
         sortBy: 'price',
       });
       
-      const result = apiUtils.parseResponse(response);
-      
-      if (result.data && Array.isArray(result.data)) {
-        setMemberships(result.data);
-      } else {
-        setMemberships([]);
-      }
+      const { data } = apiUtils.parseResponse(response);
+      setMemberships(data || []);
     } catch (error) {
       console.error('Error fetching memberships:', error);
-      const errorInfo = apiUtils.handleError(error);
-      setError(errorInfo.message);
-      showError('Failed to load memberships');
+      setError(error.message || 'Failed to load memberships');
+      showToast(error.message || 'Failed to load memberships', 'error');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMemberships();
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -198,12 +202,24 @@ export default function MembershipScreen() {
 
   const handleSubscribe = (membership) => {
     if (!userToken) {
-      showInfo('Please log in to subscribe to a membership plan');
+      showToast('Please log in to subscribe to a membership plan', 'warning');
       return;
     }
     
-    // TODO: Implement payment flow
-    showInfo(`Selected ${membership.name} plan. Payment integration coming soon!`);
+    setSelectedMembership(membership);
+    setPaymentModalVisible(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    setPaymentModalVisible(false);
+    setSelectedMembership(null);
+    showToast('Payment successful! Your membership has been activated.', 'success');
+    // Optionally refresh user data or navigate to a success screen
+  };
+
+  const handlePaymentModalClose = () => {
+    setPaymentModalVisible(false);
+    setSelectedMembership(null);
   };
 
   if (loading) {
@@ -288,39 +304,48 @@ export default function MembershipScreen() {
                 />
               ))
             ) : (
-              <View style={[styles.card, localStyles.emptyContainer]}>
-                <Ionicons name="card" size={48} color={theme.colors.textMuted} />
-                <Text style={[styles.bodyText, { color: theme.colors.textSecondary, textAlign: 'center', marginTop: 16 }]}>
-                  No membership plans available at the moment.
+              <View style={[styles.emptyContainer, localStyles.emptyContainer]}>
+                <Ionicons name="diamond-outline" size={48} color={theme.colors.textSecondary} />
+                <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+                  No Memberships Available
+                </Text>
+                <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
+                  Check back later for new membership plans
                 </Text>
               </View>
             )}
           </View>
         )}
       </ScrollView>
+
+      {/* Payment Modal */}
+      <PaymentModal
+        visible={paymentModalVisible}
+        onClose={handlePaymentModalClose}
+        membership={selectedMembership}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
     </View>
   );
 }
 
 const localStyles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 20,
+    paddingBottom: 32,
   },
   header: {
     marginHorizontal: 16,
     marginTop: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#1D1D1D',
-    overflow: 'hidden',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
   titleContainer: {
     flexDirection: 'row',
@@ -328,88 +353,88 @@ const localStyles = StyleSheet.create({
     marginBottom: 8,
   },
   titleIcon: {
-    marginRight: 12,
+    marginRight: 8,
   },
   membershipContainer: {
+    marginTop: 24,
     paddingHorizontal: 16,
+    gap: 16,
   },
   membershipCard: {
-    borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
+    borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   cardHeader: {
-    alignItems: 'center',
     marginBottom: 16,
   },
   membershipBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
   },
   membershipName: {
-    fontSize: 18,
-    fontFamily: 'Mulish-SemiBold',
+    fontSize: 16,
+    fontFamily: 'Mulish-Bold',
   },
   membershipDescription: {
     fontSize: 14,
     fontFamily: 'Mulish-Regular',
     lineHeight: 20,
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 16,
   },
   membershipDetails: {
     marginBottom: 20,
+    gap: 8,
   },
   detailRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 8,
   },
-  detailLabel: {
+  detailText: {
     fontSize: 14,
-    fontFamily: 'Mulish-Medium',
+    fontFamily: 'Mulish-Regular',
   },
-  detailValue: {
-    fontSize: 14,
-    fontFamily: 'Mulish-Medium',
+  priceContainer: {
+    marginBottom: 20,
   },
-  priceValue: {
-    fontSize: 16,
+  price: {
+    fontSize: 24,
     fontFamily: 'Mulish-Bold',
   },
   subscribeButton: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    justifyContent: 'center',
   },
   subscribeButtonText: {
     fontSize: 16,
-    fontFamily: 'Mulish-SemiBold',
+    fontFamily: 'Mulish-Bold',
   },
   errorContainer: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 16,
-    padding: 16,
   },
   retryButton: {
-    marginLeft: 'auto',
-    minWidth: 80,
+    marginLeft: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   emptyContainer: {
+    marginTop: 48,
     alignItems: 'center',
-    paddingVertical: 40,
-    margin: 16,
+    paddingHorizontal: 32,
   },
 });

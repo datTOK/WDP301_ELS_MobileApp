@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Card, Button } from "react-native-elements";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -18,7 +18,7 @@ import { testService, apiUtils, userTestService } from "../services";
 import { AxiosError } from "axios";
 
 const TestScreenDetail = ({ route, navigation }) => {
-  const { testId, testName } = route.params;
+  const { testId, testName, isRetry } = route.params;
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
@@ -30,16 +30,16 @@ const TestScreenDetail = ({ route, navigation }) => {
   const { userToken, user } = useAuth();
   const { showError } = useToast();
 
-  const fetchUserId = async () => {
+  const fetchUserId = useCallback(async () => {
     try {
       return user?._id || null;
     } catch (error) {
       console.error("Error fetching user ID:", error);
       return null;
     }
-  };
+  }, [user?._id]);
 
-  const fetchQuestions = async () => {
+  const fetchQuestions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -59,9 +59,9 @@ const TestScreenDetail = ({ route, navigation }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [testId, showError]);
 
-  const fetchUserTest = async () => {
+  const fetchUserTest = useCallback(async () => {
     try {
       const userId = await fetchUserId();
       if (!userId) return;
@@ -79,34 +79,55 @@ const TestScreenDetail = ({ route, navigation }) => {
         setUserTest(result.data[0]);
       }
     } catch (err) {
-      console.error(
-        "Error fetching user test:",
-        err instanceof AxiosError ? err.response?.data?.message : err
-      );
+      // Handle the case where user test doesn't exist (404 error)
+      if (err instanceof AxiosError && err.response?.status === 404) {
+        console.log("No user test found for this test - user hasn't taken it yet");
+        setUserTest(null);
+      } else {
+        console.error(
+          "Error fetching user test:",
+          err instanceof AxiosError ? err.response?.data?.message : err.message
+        );
+        // Don't show error toast for "not found" as it's expected for new tests
+        if (!(err instanceof AxiosError && err.response?.status === 404)) {
+          showError("Error fetching user test data");
+        }
+      }
     }
-  };
+  }, [testId, fetchUserId, showError]);
 
-  useEffect(() => {
-    fetchQuestions();
-    fetchUserTest();
-  }, [testId]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchQuestions();
+      // If this is a retry, don't fetch user test data to show fresh test
+      if (!isRetry) {
+        fetchUserTest();
+      } else {
+        // Reset user test state for retry
+        setUserTest(null);
+        setJustSubmitted(false);
+        setResult(null);
+        setAnswers({});
+      }
+    }, [testId, isRetry, fetchQuestions, fetchUserTest])
+  );
 
-  const handleSelect = (questionId, option) => {
+  const handleSelect = useCallback((questionId, option) => {
     setAnswers((prev) => ({
       ...prev,
       [questionId]: prev[questionId] ? [...prev[questionId], option] : [option],
     }));
-  };
+  }, []);
 
   // Add new handler
-  const handleTextChange = (questionId, text) => {
+  const handleTextChange = useCallback((questionId, text) => {
     setAnswers((prev) => ({
       ...prev,
       [questionId]: [text], // Store entire string as single array element
     }));
-  };
+  }, []);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
       const apiAnswers = Object.entries(answers).map(
@@ -138,13 +159,14 @@ const TestScreenDetail = ({ route, navigation }) => {
       setAnswers({});
       setSubmitting(false);
     }
-  };
+  }, [testId, answers, user._id, fetchUserTest, showError]);
 
-  const handleRedoTest = () => {
+  const handleRedoTest = useCallback(() => {
     setAnswers({});
     setResult(null);
     setJustSubmitted(false);
-  };
+    setUserTest(null); // Reset user test data to show fresh test
+  }, []);
 
   const ProgressBar = ({ value, max }) => (
     <View
@@ -172,7 +194,7 @@ const TestScreenDetail = ({ route, navigation }) => {
       <View style={styles.resultSummaryRow}>
         <Text style={styles.resultScoreModern}>Score: {submission.score}</Text>
         <Text style={styles.resultStatusModern}>
-          Status: {submission.status}
+          Status: {submission.status?.charAt(0).toUpperCase() + submission.status?.slice(1).toLowerCase()}
         </Text>
       </View>
       <Text style={styles.resultDescriptionModern}>
@@ -216,20 +238,36 @@ const TestScreenDetail = ({ route, navigation }) => {
 
   // Show loading spinner if loading
   if (loading) {
-    return <LoadingSpinner fullScreen text="Loading test..." />;
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        <LoadingSpinner fullScreen text="Loading test..." />
+      </View>
+    );
   }
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={50} color="#ff6b6b" />
-        <Text style={styles.errorText}>{error}</Text>
-        <Button
-          title="Retry"
-          onPress={fetchQuestions}
-          buttonStyle={styles.retryButton}
-          titleStyle={styles.retryButtonText}
-        />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={50} color="#ff6b6b" />
+          <Text style={styles.errorText}>{error}</Text>
+          <Button
+            title="Retry"
+            onPress={fetchQuestions}
+            buttonStyle={styles.retryButton}
+            titleStyle={styles.retryButtonText}
+          />
+        </View>
       </View>
     );
   }
@@ -237,12 +275,18 @@ const TestScreenDetail = ({ route, navigation }) => {
   // If just submitted, show last attempt result
   if (justSubmitted && result && result.submission) {
     return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Card containerStyle={styles.card}>
-          <Card.Title style={styles.cardTitle}>{testName || "Test"}</Card.Title>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentInner}
+        >
+          <Card containerStyle={styles.card}>
+            <Text style={styles.cardTitle}>{testName || "Test"}</Text>
           <Text
             style={{ color: "#ffc107", textAlign: "center", marginBottom: 8 }}
           >
@@ -251,19 +295,26 @@ const TestScreenDetail = ({ route, navigation }) => {
           </Text>
           {renderResultView(result.submission)}
         </Card>
-      </ScrollView>
+        </ScrollView>
+      </View>
     );
   }
 
   // If userTest exists and has testId, show result view (highest score)
   if (userTest && userTest.testId) {
     return (
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <Card containerStyle={styles.card}>
-          <Card.Title style={styles.cardTitle}>{testName || "Test"}</Card.Title>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentInner}
+        >
+          <Card containerStyle={styles.card}>
+            <Text style={styles.cardTitle}>{testName || "Test"}</Text>
           {userTest.attemptNo > 1 && (
             <Text
               style={{ color: "#ffc107", textAlign: "center", marginBottom: 8 }}
@@ -273,16 +324,23 @@ const TestScreenDetail = ({ route, navigation }) => {
           )}
           {renderResultView(userTest)}
         </Card>
-      </ScrollView>
+        </ScrollView>
+      </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-    >
-      <Card containerStyle={styles.card}>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+      <ScrollView
+        style={styles.scrollContent}
+        contentContainerStyle={styles.scrollContentInner}
+      >
+        <Card containerStyle={styles.card}>
         <Card.Title style={styles.cardTitle}>{testName || "Test"}</Card.Title>
         {userTest && (
           <View style={styles.userTestResult}>
@@ -296,7 +354,7 @@ const TestScreenDetail = ({ route, navigation }) => {
               color={userTest.status === "passed" ? "#28a745" : "#dc3545"}
             />
             <Text style={styles.userTestScore}>Score: {userTest.score}</Text>
-            <Text style={styles.userTestStatus}>Status: {userTest.status}</Text>
+            <Text style={styles.userTestStatus}>Status: {userTest.status?.charAt(0).toUpperCase() + userTest.status?.slice(1).toLowerCase()}</Text>
             <Text style={styles.userTestAttempt}>
               Attempt: {userTest.attemptNo}
             </Text>
@@ -361,7 +419,7 @@ const TestScreenDetail = ({ route, navigation }) => {
               Score: {result.submission?.score ?? "-"}
             </Text>
             <Text style={styles.resultStatus}>
-              Status: {result.submission?.status ?? "-"}
+              Status: {result.submission?.status ? result.submission.status.charAt(0).toUpperCase() + result.submission.status.slice(1).toLowerCase() : "-"}
             </Text>
             <Text style={styles.resultDescription}>
               {result.submission?.description}
@@ -394,13 +452,26 @@ const TestScreenDetail = ({ route, navigation }) => {
           </View>
         )}
       </Card>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  scrollContent: { flexGrow: 1, paddingBottom: 30 },
+  container: { flex: 1, backgroundColor: "#2b2b2b" },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 16,
+    backgroundColor: '#2b2b2b',
+  },
+  backButton: {
+    padding: 8,
+  },
+  scrollContent: { flex: 1, paddingBottom: 30 },
+  scrollContentInner: { flexGrow: 1, paddingBottom: 30 },
   card: {
     borderRadius: 12,
     margin: 15,
@@ -408,10 +479,11 @@ const styles = StyleSheet.create({
     borderColor: "#333",
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: "Mulish-Bold",
     color: "#fff",
     textAlign: "center",
+    marginBottom: 10
   },
   userTestResult: {
     flexDirection: "row",
@@ -420,8 +492,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   userTestScore: { color: "#fff", fontFamily: "Mulish-Bold", marginLeft: 8 },
-  userTestStatus: { color: "#fff", marginLeft: 8 },
-  userTestAttempt: { color: "#fff", marginLeft: 8 },
+  userTestStatus: { color: "#fff", fontFamily: "Mulish-Regular", marginLeft: 8 },
+  userTestAttempt: { color: "#fff", fontFamily: "Mulish-Regular", marginLeft: 8 },
   questionContainer: { marginBottom: 20 },
   questionText: {
     color: "#fff",
@@ -436,7 +508,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   selectedOption: { backgroundColor: "#007AFF" },
-  optionText: { color: "#fff" },
+  optionText: { color: "#fff", fontFamily: "Mulish-Regular" },
   submitButton: { backgroundColor: "#28a745", borderRadius: 8, marginTop: 10 },
   submitButtonText: { color: "#fff", fontFamily: "Mulish-Bold", fontSize: 16 },
   resultContainer: { alignItems: "center", marginTop: 20 },
@@ -446,20 +518,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginTop: 10,
   },
-  resultScore: { color: "#fff", fontSize: 16, marginTop: 5 },
-  resultStatus: { color: "#fff", fontSize: 16, marginTop: 5 },
+  resultScore: { color: "#fff", fontSize: 16, marginTop: 5, fontFamily: "Mulish-Regular" },
+  resultStatus: { color: "#fff", fontSize: 16, marginTop: 5, fontFamily: "Mulish-Regular" },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#2b2b2b",
   },
-  loadingText: { color: "#007AFF", marginTop: 10 },
+  loadingText: { color: "#007AFF", marginTop: 10, fontFamily: "Mulish-Regular" },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#2b2b2b",
     padding: 20,
   },
   errorText: {
@@ -467,6 +539,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     textAlign: "center",
+    fontFamily: "Mulish-Regular",
   },
   retryButton: {
     backgroundColor: "#007bff",
@@ -484,6 +557,7 @@ const styles = StyleSheet.create({
     borderColor: "#444",
     marginBottom: 6,
     fontSize: 15,
+    fontFamily: "Mulish-Regular",
   },
   questionImage: {
     width: "100%",
@@ -499,18 +573,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   resultQuestion: { color: "#fff", fontFamily: "Mulish-Bold", fontSize: 15 },
-  resultYourAnswer: { color: "#fff", marginTop: 4 },
-  resultCorrectAnswer: { color: "#ffc107", marginTop: 2 },
+  resultYourAnswer: { color: "#fff", marginTop: 4, fontFamily: "Mulish-Regular" },
+  resultCorrectAnswer: { color: "#ffc107", marginTop: 2, fontFamily: "Mulish-Regular" },
   resultCorrect: { color: "#28a745", fontFamily: "Mulish-Bold", marginTop: 2 },
   resultIncorrect: {
     color: "#ff6b6b",
     fontFamily: "Mulish-Bold",
     marginTop: 2,
   },
-  resultDescription: { color: "#ccc", fontSize: 13, marginTop: 8 },
+  resultDescription: { color: "#ccc", fontSize: 13, marginTop: 8, fontFamily: "Mulish-Regular" },
   // New styles for modern result view
   resultContainerModern: {
-    alignItems: "center",
+    alignItems: "flex-start",
     marginTop: 10,
     backgroundColor: "#181818",
     borderRadius: 14,
@@ -523,6 +597,7 @@ const styles = StyleSheet.create({
     fontFamily: "Mulish-Bold",
     fontSize: 22,
     marginBottom: 8,
+    alignSelf: "center",
   },
   resultSummaryRow: {
     flexDirection: "row",
@@ -530,13 +605,15 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: 8,
   },
-  resultScoreModern: { color: "#fff", fontSize: 16 },
-  resultStatusModern: { color: "#fff", fontSize: 16 },
+  resultScoreModern: { color: "#fff", fontSize: 16, fontFamily: "Mulish-Regular" },
+  resultStatusModern: { color: "#fff", fontSize: 16, fontFamily: "Mulish-Regular" },
   resultDescriptionModern: {
     color: "#ccc",
-    fontSize: 14,
-    marginBottom: 10,
-    textAlign: "center",
+    fontSize: 16,
+    marginBottom: 16,
+    textAlign: "left",
+    fontFamily: "Mulish-Regular",
+    lineHeight: 22,
   },
   resultItemModern: {
     width: "100%",
@@ -552,10 +629,10 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Mulish-Bold",
     fontSize: 15,
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  resultYourAnswerModern: { color: "#fff", marginTop: 2 },
-  resultCorrectAnswerModern: { color: "#fff", marginTop: 2 },
+  resultYourAnswerModern: { color: "#fff", marginTop: 4, fontFamily: "Mulish-Regular" },
+  resultCorrectAnswerModern: { color: "#fff", marginTop: 4, fontFamily: "Mulish-Regular" },
   resultImage: {
     width: "100%",
     height: 120,

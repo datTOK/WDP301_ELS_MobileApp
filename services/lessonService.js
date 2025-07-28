@@ -29,6 +29,20 @@ class LessonService {
   }
 
   /**
+   * Get lessons by course ID
+   * Backend route: GET /api/courses/:id/lessons (id = courseId)
+   * @param {string} courseId - Course ID
+   * @param {Object} params - Query parameters
+   * @param {number} params.page - Page number
+   * @param {number} params.size - Page size
+   * @returns {Promise<Object>} Course lessons response
+   */
+  async getLessonsByCourseId(courseId, params = {}) {
+    const response = await api.get(`/api/courses/${courseId}/lessons`, { params });
+    return response.data;
+  }
+
+  /**
    * Get lesson grammars by lesson ID
    * Backend route: GET /api/lessons/:id/grammars (id = lessonId)
    * @param {string} lessonId - Lesson ID
